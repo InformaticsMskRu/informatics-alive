@@ -1,14 +1,15 @@
-import unittest
 from datetime import datetime, timedelta
 
 from flask import url_for
 
 from rmatics.model.base import db
 from rmatics.model.group import Group, UserGroup
-from rmatics.model.problem import Problem
 from rmatics.model.run import Run
 from rmatics.model.user import SimpleUser
 from rmatics.testutils import TestCase
+
+CONTEXT_SOURCE = 10
+CONTEXT_ID = 20
 
 
 class TestAPIProblemSubmission(TestCase):
@@ -23,9 +24,7 @@ class TestAPIProblemSubmission(TestCase):
 
         self.user1 = SimpleUser(firstname='user1', lastname='user1')
         self.user2 = SimpleUser(firstname='user2', lastname='user2')
-
         db.session.add_all([self.user1, self.user2])
-
         db.session.flush()
 
         self.run1 = Run(user_id=self.user1.id, problem_id=self.problems[1].id,
@@ -38,6 +37,11 @@ class TestAPIProblemSubmission(TestCase):
                         ejudge_status=2, ejudge_language_id=2)
 
         self.run4.create_time = datetime.utcnow() - timedelta(days=1)
+
+        # Context tests fixtures
+        self.run1.context_id = CONTEXT_ID
+        self.run2.context_source = CONTEXT_SOURCE
+        self.run3.is_visible = True
 
         db.session.add_all([self.run1, self.run2, self.run3, self.run4])
 
@@ -173,7 +177,6 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(len(data['data']), 1)
 
     def test_filter_by_from_timestamp(self):
-
         from_time = int((datetime.utcnow() - timedelta(hours=1)).timestamp() * 1000)
 
         resp = self.send_request(self.problems[2].id, from_timestamp=from_time)
@@ -189,7 +192,6 @@ class TestAPIProblemSubmission(TestCase):
         self.assert400(resp)
 
     def test_filter_by_to_timestamp(self):
-
         to_time = int((datetime.utcnow() - timedelta(hours=1)).timestamp() * 1000)
 
         resp = self.send_request(self.problems[2].id, to_timestamp=to_time)
@@ -233,3 +235,17 @@ class TestAPIProblemSubmission(TestCase):
         data = resp.get_json()
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
+
+    def test_filter_by_context(self):
+        resp = self.send_request(self.problems[1].id, context_id=CONTEXT_ID)
+
+        self.assert200(resp)
+
+        data = resp.get_json()
+        self.assertEqual(data['result'], 'success')
+        self.assertEqual(len(data['data']), 1)
+
+    # TODO: filter by:
+    #  context source
+    #  visibliliity
+    #  insufficent payload set

@@ -50,11 +50,11 @@ class TestAPIProblemSubmission(TestCase):
             return self.client.post(route, data=payload)
 
     def test_basic_request_with_context(self):
-        statement_id = self.statements[0].id
+        context_id = 3
         is_visible = True
 
         payload = {
-            'statement_id': statement_id,
+            'context_id': context_id,
             'context_source': self.CONTEXT_SOURCE,
             'is_visible': is_visible,
         }
@@ -71,6 +71,6 @@ class TestAPIProblemSubmission(TestCase):
         run = db.session.query(Run).get(run_id)
         self.assertIsNotNone(run)
 
-        self.assertEqual(run.statement_id, statement_id)
+        self.assertEqual(run.context_id, context_id)
         self.assertEqual(run.context_source, self.CONTEXT_SOURCE)
         self.assertEqual(run.is_visible, is_visible)

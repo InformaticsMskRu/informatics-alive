@@ -5,17 +5,16 @@ from flask import (
     request,
 )
 from flask import jsonify as flask_jsonify
-from sqlalchemy.orm import Load
-from werkzeug.exceptions import BadRequest, NotFound
 from flask.views import MethodView
+from marshmallow import fields
+from sqlalchemy import desc
+from sqlalchemy.orm import Load
+from webargs.flaskparser import parser
+from werkzeug.exceptions import BadRequest, NotFound
+
 from rmatics.ejudge.submit_queue import (
-    get_last_get_id,
     queue_submit,
 )
-from sqlalchemy import desc
-from webargs.flaskparser import parser
-from marshmallow import fields
-
 from rmatics.model import CourseModule
 from rmatics.model.base import db
 from rmatics.model.group import UserGroup
@@ -24,18 +23,18 @@ from rmatics.model.run import Run
 from rmatics.model.user import SimpleUser
 from rmatics.utils.response import jsonify
 from rmatics.view import get_problems_by_statement_id
-from rmatics.view.problem.serializers.run import RunSchema
-
 from rmatics.view.problem.serializers.problem import ProblemSchema
+from rmatics.view.problem.serializers.run import RunSchema
 
 
 class TrustedSubmitApi(MethodView):
     post_args = {
         'lang_id': fields.Integer(required=True),
+        'statement_id': fields.Integer(),
         'user_id': fields.Integer(required=True),
 
         # Context arguments
-        'statement_id': fields.Integer(required=True),
+        'context_id': fields.Integer(required=True),
         'is_visible': fields.Boolean(required=True),
         'context_source': fields.Integer(required=True),
     }
@@ -64,10 +63,12 @@ class TrustedSubmitApi(MethodView):
 
         language_id = args['lang_id']
         statement_id = args.get('statement_id')
-        context_source = args.get('context_source')
-        is_visible = args.get('is_visible')
         user_id = args.get('user_id')
         file = parser.parse_files(request, 'file', 'file')
+
+        context_source = args.get('context_source')
+        context_id = args.get('context_id')
+        is_visible = args.get('is_visible')
 
         # Здесь НЕЛЬЗЯ использовать .get(problem_id), см EjudgeProblem.__doc__
         problem = db.session.query(EjudgeProblem) \
@@ -94,12 +95,13 @@ class TrustedSubmitApi(MethodView):
         run = Run(
             user_id=user_id,
             problem_id=problem_id,
+            statement_id=statement_id,
             ejudge_contest_id=problem.ejudge_contest_id,
             ejudge_language_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
             # Context related properties
-            statement_id=statement_id,
+            context_id=context_id,
             context_source=context_source,
             is_visible=is_visible,
         )
@@ -144,7 +146,12 @@ get_args = {
     'count': fields.Integer(default=10, missing=10),
     'page': fields.Integer(required=True),
     'from_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
-    'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
+    'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем,
+    # Internal context scope arguments
+    'context_id': fields.Integer(required=False),
+    'context_source': fields.Integer(required=False),
+    'is_visible': fields.Boolean(required=False, default=True),
+    'show_hidden': fields.Boolean(required=False, default=False),
 }
 
 
@@ -173,6 +180,7 @@ class ProblemSubmissionsFilterApi(MethodView):
         If problem_id = 0 we are trying to find problems by
         CourseModule == statement_id
     """
+
     def get(self, problem_id: int):
 
         args = parser.parse(get_args, request)
@@ -217,6 +225,11 @@ class ProblemSubmissionsFilterApi(MethodView):
         statement_id = request.args.get('statement_id', type=int, default=None)
         from_timestamp = args.get('from_timestamp')
         to_timestamp = args.get('to_timestamp')
+
+        # Context arguments
+        context_id = args.get('context_id')
+        context_source = args.get('context_source')
+        is_visible = args.get('is_visible')
 
         try:
             from_timestamp = from_timestamp and from_timestamp != -1 and \
@@ -267,5 +280,9 @@ class ProblemSubmissionsFilterApi(MethodView):
             problem_id_filter_smt = Run.problem_id.in_(problem_ids)
         if problem_id_filter_smt is not None:
             query = query.filter(problem_id_filter_smt)
+
+        # apply context filters
+        if context_id is not None:
+            query = query.filter(Run.context_id == context_id)
 
         return query

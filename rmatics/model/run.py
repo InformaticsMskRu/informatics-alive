@@ -32,10 +32,12 @@ class Run(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_user.id'))
     problem_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_problems.id'))
+    statement_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_statements.id'))
     score = db.Column(db.Integer)
 
     user = db.relationship('SimpleUser', backref='runs', lazy='select')
     problem = db.relationship('EjudgeProblem', backref=db.backref('runs', lazy='dynamic'))
+    statement = db.relationship('Statement', backref='runs')
 
     create_time = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
 
@@ -56,7 +58,7 @@ class Run(db.Model):
     source_hash = db.Column(db.String(32))  # We are using md5 hex digest
 
     # Context fields
-    statement_id = db.Column(db.Integer, nullable=True)
+    context_id = db.Column(db.Integer, nullable=True)
     context_source = db.Column(db.Integer, nullable=True)
     is_visible = db.Column(db.Boolean, nullable=True, default=False)
 
