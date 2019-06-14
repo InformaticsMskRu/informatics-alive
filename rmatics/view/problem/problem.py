@@ -32,8 +32,12 @@ from rmatics.view.problem.serializers.problem import ProblemSchema
 class TrustedSubmitApi(MethodView):
     post_args = {
         'lang_id': fields.Integer(required=True),
-        'statement_id': fields.Integer(),
         'user_id': fields.Integer(required=True),
+
+        # Context arguments
+        'statement_id': fields.Integer(required=True),
+        'is_visible': fields.Boolean(required=True),
+        'context_source': fields.Integer(required=True),
     }
 
     @staticmethod
@@ -60,6 +64,8 @@ class TrustedSubmitApi(MethodView):
 
         language_id = args['lang_id']
         statement_id = args.get('statement_id')
+        context_source = args.get('context_source')
+        is_visible = args.get('is_visible')
         user_id = args.get('user_id')
         file = parser.parse_files(request, 'file', 'file')
 
@@ -83,15 +89,19 @@ class TrustedSubmitApi(MethodView):
         if duplicate is not None and duplicate.source_hash == source_hash:
             raise BadRequest('Source file is duplicate of your previous submission')
 
-        # TODO: разобраться, есть ли там constraint на statement_id
+        # There is not constraint on statement_id
+        # Any context representatio integer can be used as statement_id
         run = Run(
             user_id=user_id,
             problem_id=problem_id,
-            statement_id=statement_id,
             ejudge_contest_id=problem.ejudge_contest_id,
             ejudge_language_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
+            # Context related properties
+            statement_id=statement_id,
+            context_source=context_source,
+            is_visible=is_visible,
         )
 
         db.session.add(run)
