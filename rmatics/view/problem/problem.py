@@ -7,7 +7,7 @@ from flask import (
 from flask import jsonify as flask_jsonify
 from flask.views import MethodView
 from marshmallow import fields
-from sqlalchemy import desc
+from sqlalchemy import desc, true
 from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
@@ -91,7 +91,6 @@ class TrustedSubmitApi(MethodView):
             raise BadRequest('Source file is duplicate of your previous submission')
 
         # There is not constraint on statement_id
-        # Any context representatio integer can be used as statement_id
         run = Run(
             user_id=user_id,
             problem_id=problem_id,
@@ -146,7 +145,7 @@ get_args = {
     'count': fields.Integer(default=10, missing=10),
     'page': fields.Integer(required=True),
     'from_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
-    'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем,
+    'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
     # Internal context scope arguments
     'context_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
@@ -286,6 +285,6 @@ class ProblemSubmissionsFilterApi(MethodView):
         if context_source is not None:
             query = query.filter(Run.context_source == context_source)
         if show_hidden is False:
-            query = query.filter(Run.is_visible == True)
+            query = query.filter(Run.is_visible == true())
 
         return query
