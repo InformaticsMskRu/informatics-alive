@@ -60,6 +60,7 @@ class Run(db.Model):
     # Context fields
     context_id = db.Column(db.Integer, nullable=True)
     context_source = db.Column(db.Integer, nullable=True)
+    # Run is not visible by default
     is_visible = db.Column(db.Boolean, nullable=True, default=False)
 
     def update_source(self, blob: bytes):

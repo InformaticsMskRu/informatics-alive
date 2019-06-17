@@ -35,8 +35,8 @@ class TrustedSubmitApi(MethodView):
 
         # Context arguments
         'context_id': fields.Integer(required=True),
-        'is_visible': fields.Boolean(required=True),
         'context_source': fields.Integer(required=True),
+        'is_visible': fields.Boolean(required=True),
     }
 
     @staticmethod
@@ -150,8 +150,7 @@ get_args = {
     # Internal context scope arguments
     'context_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
-    'is_visible': fields.Boolean(required=False, default=True),
-    'show_hidden': fields.Boolean(required=False, default=False),
+    'show_hidden': fields.Boolean(required=False, missing=False, default=False),
 }
 
 
@@ -229,7 +228,7 @@ class ProblemSubmissionsFilterApi(MethodView):
         # Context arguments
         context_id = args.get('context_id')
         context_source = args.get('context_source')
-        is_visible = args.get('is_visible')
+        show_hidden = args.get('show_hidden')
 
         try:
             from_timestamp = from_timestamp and from_timestamp != -1 and \
@@ -284,5 +283,9 @@ class ProblemSubmissionsFilterApi(MethodView):
         # apply context filters
         if context_id is not None:
             query = query.filter(Run.context_id == context_id)
+        if context_source is not None:
+            query = query.filter(Run.context_source == context_source)
+        if show_hidden is False:
+            query = query.filter(Run.is_visible == True)
 
         return query

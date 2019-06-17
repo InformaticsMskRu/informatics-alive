@@ -28,12 +28,14 @@ class TestAPIProblemSubmission(TestCase):
         db.session.flush()
 
         self.run1 = Run(user_id=self.user1.id, problem_id=self.problems[1].id,
-                        ejudge_status=0, ejudge_language_id=1)
+                        ejudge_status=0, ejudge_language_id=1, is_visible=True)
         self.run2 = Run(user_id=self.user1.id, problem_id=self.problems[2].id,
-                        ejudge_status=0, ejudge_language_id=1)
+                        ejudge_status=0, ejudge_language_id=1, is_visible=True)
         self.run3 = Run(user_id=self.user2.id, problem_id=self.problems[1].id,
-                        ejudge_status=2, ejudge_language_id=2)
+                        ejudge_status=2, ejudge_language_id=2, is_visible=True)
         self.run4 = Run(user_id=self.user2.id, problem_id=self.problems[2].id,
+                        ejudge_status=2, ejudge_language_id=2, is_visible=True)
+        self.run5 = Run(user_id=self.user2.id, problem_id=self.problems[1].id,
                         ejudge_status=2, ejudge_language_id=2)
 
         self.run4.create_time = datetime.utcnow() - timedelta(days=1)
@@ -41,9 +43,8 @@ class TestAPIProblemSubmission(TestCase):
         # Context tests fixtures
         self.run1.context_id = CONTEXT_ID
         self.run2.context_source = CONTEXT_SOURCE
-        self.run3.is_visible = True
 
-        db.session.add_all([self.run1, self.run2, self.run3, self.run4])
+        db.session.add_all([self.run1, self.run2, self.run3, self.run4, self.run5])
 
         self.group = Group()
         db.session.add(self.group)
@@ -245,7 +246,29 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
 
-    # TODO: filter by:
-    #  context source
-    #  visibliliity
-    #  insufficent payload set
+    def test_filter_by_context_source(self):
+        resp = self.send_request(self.problems[2].id, context_source=CONTEXT_SOURCE)
+
+        self.assert200(resp)
+
+        data = resp.get_json()
+        self.assertEqual(data['result'], 'success')
+        self.assertEqual(len(data['data']), 1)
+
+    def test_filter_by_visibillity_missing(self):
+        resp = self.send_request(self.problems[1].id)
+
+        self.assert200(resp)
+
+        data = resp.get_json()
+        self.assertEqual(data['result'], 'success')
+        self.assertEqual(len(data['data']), 2)
+
+    def test_filter_by_visibillity_hidden(self):
+        resp = self.send_request(self.problems[1].id, show_hidden=True)
+
+        self.assert200(resp)
+
+        data = resp.get_json()
+        self.assertEqual(data['result'], 'success')
+        self.assertEqual(len(data['data']), 3)
