@@ -255,16 +255,7 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
 
-    def test_filter_by_visibillity_missing(self):
-        resp = self.send_request(self.problems[1].id)
-
-        self.assert200(resp)
-
-        data = resp.get_json()
-        self.assertEqual(data['result'], 'success')
-        self.assertEqual(len(data['data']), 2)
-
-    def test_filter_by_visibillity_hidden(self):
+    def test_filter_by_visibillity(self):
         resp = self.send_request(self.problems[1].id, show_hidden=True)
 
         self.assert200(resp)
