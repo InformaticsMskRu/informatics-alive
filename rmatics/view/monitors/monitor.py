@@ -3,10 +3,10 @@ from collections import namedtuple, OrderedDict
 from typing import Iterable, Tuple, Optional
 
 from flask import request
-from marshmallow import fields
-from sqlalchemy import select
-from webargs.flaskparser import parser
 from flask.views import MethodView
+from marshmallow import fields
+from sqlalchemy import select, true
+from webargs.flaskparser import parser
 
 from rmatics import db, monitor_cacher
 from rmatics.model import SimpleUser, UserGroup, CourseModule, Statement, MonitorCourseModule
@@ -24,7 +24,8 @@ ProblemBasedMonitorData = namedtuple('ProblemBasedMonitorData', ('problem_id', '
 
 @monitor_cacher
 def get_runs(problem_id: int = None, user_ids: Iterable = None,
-             time_after: int = None, time_before: int = None):
+             time_after: int = None, time_before: int = None,
+             context_id: int = None, context_source: int = None, show_hidden: bool = None):
     """ We are using SQLAlchemy Сore to speedup multiply object fetching and serializing """
 
     query = select([LightWeightRun, LightWeightUser]) \
@@ -42,6 +43,14 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
     if time_before is not None:
         time_before = datetime.datetime.fromtimestamp(time_before)
         query = query.where(LightWeightRun.c.create_time < time_before)
+
+    # apply context filters
+    if context_id is not None:
+        query = query.where(LightWeightRun.c.context_id == context_id)
+    if context_source is not None:
+        query = query.where(LightWeightRun.c.context_source == context_source)
+    if show_hidden is False:
+        query = query.where(LightWeightRun.c.is_visible == true())
 
     query = query.order_by(LightWeightRun.c.id)
 
@@ -72,6 +81,10 @@ contest_based_get_args = {
     'contest_id': fields.List(fields.Integer(), required=True),
     'time_before': fields.Integer(missing=None),
     'time_after': fields.Integer(missing=None),
+    # Internal context scope arguments
+    'context_id': fields.Integer(required=False),
+    'context_source': fields.Integer(required=False),
+    'show_hidden': fields.Boolean(required=False),
 }
 
 
@@ -83,6 +96,10 @@ class ContestBasedMonitorAPIView(MethodView):
         group_id = args['group_id']
         time_before = args['time_before']
         time_after = args['time_after']
+        # Context arguments
+        context_id = args.get('context_id')
+        context_source = args.get('context_source')
+        show_hidden = args.get('show_hidden')
 
         contest_ids = []
         for cm_id in course_module_ids:
@@ -91,8 +108,8 @@ class ContestBasedMonitorAPIView(MethodView):
             group_id = group_id or monitor_group_id
 
         if group_id:
-            users = db.session.query(SimpleUser)\
-                .join(UserGroup, UserGroup.user_id == SimpleUser.id)\
+            users = db.session.query(SimpleUser) \
+                .join(UserGroup, UserGroup.user_id == SimpleUser.id) \
                 .filter(UserGroup.group_id == group_id)
             user_ids = [user.id for user in users]
         else:
@@ -108,7 +125,11 @@ class ContestBasedMonitorAPIView(MethodView):
                 runs = get_runs(problem_id=problem.id,
                                 user_ids=user_ids,
                                 time_before=time_before,
-                                time_after=time_after)
+                                time_after=time_after,
+                                context_source=context_source,
+                                context_id=context_id,
+                                show_hidden=show_hidden
+                                )
                 monitor_data = ContestBasedMonitorData(contest_id, problem, runs)
                 contest_problems_runs.append(monitor_data)
 
@@ -158,6 +179,10 @@ problem_based_get_args = {
     'problem_id': fields.List(fields.Integer(), required=True),
     'time_before': fields.Integer(missing=None),
     'time_after': fields.Integer(missing=None),
+    # Internal context scope arguments
+    'context_id': fields.Integer(required=False),
+    'context_source': fields.Integer(required=False),
+    'show_hidden': fields.Boolean(required=False),
 }
 
 
@@ -165,20 +190,29 @@ class ProblemBasedMonitorAPIView(MethodView):
     """ This view if for splitting Monitors and moodle db
         We would like avoid Contests and MonitorStatements and Groups here
     """
+
     def get(self):
         # TODO: Приделать контекст посылки (NFRMTCS-192)
         args = parser.parse(problem_based_get_args, request)
+
         user_ids = args['user_id']
         problem_ids = args['problem_id']
         time_before = args['time_before']
         time_after = args['time_after']
+        # Context arguments
+        context_id = args.get('context_id')
+        context_source = args.get('context_source')
+        show_hidden = args.get('show_hidden')
 
         problem_runs = []
         for problem_id in problem_ids:
             runs = get_runs(problem_id=problem_id,
                             user_ids=user_ids,
                             time_before=time_before,
-                            time_after=time_after)
+                            time_after=time_after,
+                            context_source=context_source,
+                            context_id=context_id,
+                            show_hidden=show_hidden, )
             problem_runs.append(ProblemBasedMonitorData(problem_id, runs))
 
         schema = ProblemBasedMonitorSchema(many=True)

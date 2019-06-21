@@ -1,4 +1,5 @@
 import datetime
+from unittest.mock import call
 
 import mock
 from flask import url_for
@@ -151,11 +152,20 @@ class TestProblemBasedMonitorGetApi(TestCase):
             mock_get_runs.return_value = runs_data
             resp = self.send_request(**data)
 
-        for problem_id in problem_ids:
-            mock_get_runs.assert_any_call(problem_id=problem_id,
-                                          user_ids=user_ids,
-                                          time_before=time_before,
-                                          time_after=time_after)
+        # As we request runs for three problems,
+        # get_runs should be called three times
+        calls = [
+            call(problem_id=p,
+                 user_ids=user_ids,
+                 time_before=time_before,
+                 time_after=time_after,
+                 context_id=None,
+                 context_source=None,
+                 show_hidden=None)
+            for p in problem_ids
+        ]
+        mock_get_runs.assert_has_calls(calls)
+
         self.assert200(resp)
         response = resp.json.get('data')
 
