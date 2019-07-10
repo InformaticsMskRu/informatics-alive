@@ -77,10 +77,13 @@ class TrustedSubmitApi(MethodView):
             raise BadRequest(e.args[0])
         source_hash = Run.generate_source_hash(text)
 
-        duplicate = db.session.query(Run).filter(Run.user_id == user_id) \
+        duplicate: Run = db.session.query(Run).filter(Run.user_id == user_id) \
             .filter(Run.problem_id == problem_id) \
             .order_by(Run.id.desc()).first()
-        if duplicate is not None and duplicate.source_hash == source_hash:
+
+        if duplicate is not None and \
+                duplicate.source_hash == source_hash and \
+                duplicate.ejudge_language_id == language_id:
             raise BadRequest('Source file is duplicate of your previous submission')
 
         # TODO: разобраться, есть ли там constraint на statement_id
