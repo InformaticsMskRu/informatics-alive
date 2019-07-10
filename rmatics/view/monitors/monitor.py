@@ -2,6 +2,7 @@ import datetime
 from collections import namedtuple, OrderedDict
 from typing import Iterable, Tuple, Optional
 
+from dateutil.tz import UTC
 from flask import request
 from marshmallow import fields
 from sqlalchemy import select
@@ -57,7 +58,7 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
                 'lastname': run[9]
             },
             'problem_id': run[2],
-            'create_time': run[3].astimezone().strftime('%Y-%m-%dT%H:%M:%S%z'),
+            'create_time': run[3].replace(tzinfo=UTC).strftime('%Y-%m-%dT%H:%M:%S%z'),
             'ejudge_score': run[4],
             'ejudge_status': run[5],
             'ejudge_test_num': run[6],
