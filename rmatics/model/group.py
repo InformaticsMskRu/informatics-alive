@@ -1,12 +1,8 @@
-from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm.collections import attribute_mapped_collection
-
 from rmatics.model.base import db
 from rmatics.utils.functions import attrs_to_dict
 
 
-
-class  Group(db.Model):
+class Group(db.Model):
     __table_args__ = (
         db.ForeignKeyConstraint(
             ['owner_id'],

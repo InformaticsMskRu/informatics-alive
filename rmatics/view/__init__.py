@@ -22,7 +22,7 @@ def handle_api_exception(api_exception):
     return response
 
 
-def get_problems_by_statement_id(statement_id: int) -> list:
+def get_problems_by_statement_id(statement_id: int, filter_hidden=True) -> list:
     """ Get all problems from is's id
          SELECT
             mdl_problems.id,
@@ -45,8 +45,11 @@ def get_problems_by_statement_id(statement_id: int) -> list:
     problems_statement_problems = db.session.query(Problem, StatementProblem) \
         .join(StatementProblem, StatementProblem.problem_id == Problem.id) \
         .filter(StatementProblem.statement_id == statement_id) \
-        .options(Load(Problem).load_only('id', 'name'))\
+        .options(Load(Problem).load_only('id', 'name')) \
         .options(Load(StatementProblem).load_only('rank'))
+
+    if filter_hidden:
+        problems_statement_problems = problems_statement_problems.filter(StatementProblem.hidden != 1)
 
     problems = []
     # Yes it is ugly but I think its better than rewrite query

@@ -47,6 +47,9 @@
     project: rmatics
     user: rmatics
     group: uwsgi
+    systemd_main_unit: rmatics_many_ports
+    # temp unit while updating main source code instance
+    systemd_main_unit_tmp: rmatics_many_ports_tmp
   tasks:
     - name: Check if source code for for requested project exists
       stat:
@@ -72,12 +75,56 @@
             dest: "/usr/src/backups/{{ project }}/{{ project }}_{{ backup_timestamp.stdout }}.tgz"
       when: new_build.stat.exists == True
 
-    - name: Stop systemd unit
-      systemd:
-        name: "{{ project }}"
-        state: stopped
+    - name: Ensure group 'uwsgi' exists
+      group:
+        name: uwsgi
+        state: present
 
-    - name: Remove old code
+    - name: Ensure user '{{ project }}' with primary group of '{{ user }}' exists
+      user:
+        name: "{{ user }}"
+        comment: "{{ project }} app-scecific user ({{ user }})"
+        group: "{{ group }}"
+
+    - name: Remove previously created old code dir
+      file:
+        path: "/usr/src/{{ project }}_tmp"
+        state: absent
+
+    - name: Create directory for temp code
+      file:
+        path: "/usr/src/{{ project }}_tmp"
+        state: directory
+
+    - name: Unpack new code to temp dir
+      unarchive:
+        src: /home/teamcity/{{ project }}.tgz
+        dest: "/usr/src/{{ project }}_tmp"
+        remote_src: yes
+        extra_opts: [--strip-components=1] # strip tar parent dir
+
+    - name: Set temp source code dir permissions
+      file:
+        path: "/usr/src/{{ project }}_tmp"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        # when specifying mode using octal numbers, add a leading 0
+        mode: 0755
+        recurse: yes
+
+    - name: Start new temporary multiple units
+      systemd:
+        name: "{{ systemd_main_unit_tmp }}@{{ item }}"
+        state: started
+      with_items: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    - name: Stop old systemd unit
+      systemd:
+        name: "{{ systemd_main_unit }}@{{ item }}"
+        state: stopped
+      with_items: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    - name: Remove main old code
       file:
         path: /usr/src/{{ project }}
         state: absent
@@ -94,17 +141,6 @@
         remote_src: yes
         extra_opts: [--strip-components=1] # strip tar parent dir
 
-    - name: Ensure group 'uwsgi' exists
-      group:
-        name: uwsgi
-        state: present
-
-    - name: Ensure user '{{ project }}' with primary group of '{{ user }}' exists
-      user:
-        name: "{{ user }}"
-        comment: "{{ project }} app-scecific user ({{ user }})"
-        group: "{{ group }}"
-
     - name: Set source code dir permissions
       file:
         path: "/usr/src/{{ project }}"
@@ -114,10 +150,22 @@
         mode: 0755
         recurse: yes
 
-    - name: Start systemd unitc
+    - name: Start new systemd main unit
       systemd:
-        name: "{{ project }}"
+        name: "{{ systemd_main_unit }}@{{ item }}"
         state: started
+      with_items: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    - name: Stop temporary multiple units
+      systemd:
+        name: "{{ systemd_main_unit_tmp }}@{{ item }}"
+        state: stopped
+      with_items: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    - name: Remove temp old code
+      file:
+        path: "/usr/src/{{ project }}_tmp"
+        state: absent
 
     - name: Restart workers unit
       systemd:
