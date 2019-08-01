@@ -281,4 +281,6 @@ class TestAPIProblemSubmission(TestCase):
         data = resp.get_json()
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
+
+        run = data['data'][0]
         self.assertEqual(run.get('id'), self.run2.id)
