@@ -32,12 +32,12 @@ class Run(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_user.id'))
     problem_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_problems.id'))
-    statement_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_statements.id'))
+    statement_id = db.Column(db.Integer)
     score = db.Column(db.Integer)
 
     user = db.relationship('SimpleUser', backref='runs', lazy='select')
     problem = db.relationship('EjudgeProblem', backref=db.backref('runs', lazy='dynamic'))
-    statement = db.relationship('Statement', backref='runs')
+    # statement = db.relationship('Statement', backref='runs')
 
     create_time = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
 

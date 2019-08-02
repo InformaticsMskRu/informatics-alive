@@ -26,6 +26,8 @@ from rmatics.view import get_problems_by_statement_id
 from rmatics.view.problem.serializers.problem import ProblemSchema
 from rmatics.view.problem.serializers.run import RunSchema
 
+DEFAULT_MOODLE_CONTEXT_SOURCE = 10
+
 
 class TrustedSubmitApi(MethodView):
     post_args = {
@@ -33,10 +35,11 @@ class TrustedSubmitApi(MethodView):
         'statement_id': fields.Integer(),
         'user_id': fields.Integer(required=True),
 
-        # Context arguments
-        'context_id': fields.Integer(required=True),
-        'context_source': fields.Integer(required=True),
-        'is_visible': fields.Boolean(required=True),
+        # Submittion context arguments.
+        # By default all submittion context parameters are optional
+        # to preserve backward compatibillity with Moodle handlers
+        'context_source': fields.Integer(required=False, missing=DEFAULT_MOODLE_CONTEXT_SOURCE),
+        'is_visible': fields.Boolean(required=False, missing=True),
     }
 
     @staticmethod
@@ -66,9 +69,10 @@ class TrustedSubmitApi(MethodView):
         user_id = args.get('user_id')
         file = parser.parse_files(request, 'file', 'file')
 
-        context_source = args.get('context_source')
-        context_id = args.get('context_id')
-        is_visible = args.get('is_visible')
+        # If context parameters are unavialable,
+        # consider it as Moodle submission and set defaults
+        context_source = args.get('context_source', DEFAULT_MOODLE_CONTEXT_SOURCE)
+        is_visible = args.get('is_visible', True)
 
         # Здесь НЕЛЬЗЯ использовать .get(problem_id), см EjudgeProblem.__doc__
         problem = db.session.query(EjudgeProblem) \
@@ -102,8 +106,8 @@ class TrustedSubmitApi(MethodView):
             ejudge_language_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
+
             # Context related properties
-            context_id=context_id,
             context_source=context_source,
             is_visible=is_visible,
         )
@@ -149,8 +153,8 @@ get_args = {
     'page': fields.Integer(required=True),
     'from_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
     'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
+
     # Internal context scope arguments
-    'context_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
     'show_hidden': fields.Boolean(required=False, missing=False, default=False),
 }
@@ -208,12 +212,11 @@ class ProblemSubmissionsFilterApi(MethodView):
         schema = RunSchema(many=True)
         data = schema.dump(runs)
 
-        return flask_jsonify(
-            {
-                'result': 'success',
-                'data': data.data,
-                'metadata': metadata
-            })
+        return flask_jsonify({
+            'result': 'success',
+            'data': data.data,
+            'metadata': metadata
+        })
 
     @classmethod
     def _build_query_by_args(cls, args, problem_id):
@@ -228,15 +231,14 @@ class ProblemSubmissionsFilterApi(MethodView):
         to_timestamp = args.get('to_timestamp')
 
         # Context arguments
-        context_id = args.get('context_id')
         context_source = args.get('context_source')
         show_hidden = args.get('show_hidden')
 
         try:
             from_timestamp = from_timestamp and from_timestamp != -1 and \
-                             datetime.datetime.fromtimestamp(from_timestamp / 1_000)
+                datetime.datetime.fromtimestamp(from_timestamp / 1_000)
             to_timestamp = to_timestamp and to_timestamp != -1 and \
-                           datetime.datetime.fromtimestamp(to_timestamp / 1_000)
+                datetime.datetime.fromtimestamp(to_timestamp / 1_000)
         except (OSError, OverflowError, ValueError):
             raise BadRequest('Bad timestamp data')
 
@@ -283,8 +285,6 @@ class ProblemSubmissionsFilterApi(MethodView):
             query = query.filter(problem_id_filter_smt)
 
         # apply context filters
-        if context_id is not None:
-            query = query.filter(Run.context_id == context_id)
         if context_source is not None:
             query = query.filter(Run.context_source == context_source)
         if show_hidden is False:

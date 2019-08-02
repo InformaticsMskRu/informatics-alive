@@ -9,7 +9,6 @@ from rmatics.model.user import SimpleUser
 from rmatics.testutils import TestCase
 
 CONTEXT_SOURCE = 10
-CONTEXT_ID = 20
 
 
 class TestAPIProblemSubmission(TestCase):
@@ -27,6 +26,7 @@ class TestAPIProblemSubmission(TestCase):
         db.session.add_all([self.user1, self.user2])
         db.session.flush()
 
+        # Runs 1-3 have the same statement_id
         self.run1 = Run(user_id=self.user1.id, problem_id=self.problems[1].id,
                         ejudge_status=0, ejudge_language_id=1, is_visible=True)
         self.run2 = Run(user_id=self.user1.id, problem_id=self.problems[2].id,
@@ -41,9 +41,7 @@ class TestAPIProblemSubmission(TestCase):
         self.run4.create_time = datetime.utcnow() - timedelta(days=1)
 
         # Context tests fixtures
-        self.run1.context_id = CONTEXT_ID
-        self.run2.context_id = CONTEXT_ID
-        self.run2.context_source = CONTEXT_SOURCE
+        self.run1.context_source = CONTEXT_SOURCE
 
         db.session.add_all([self.run1, self.run2, self.run3, self.run4, self.run5])
 
@@ -238,8 +236,8 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
 
-    def test_filter_by_context(self):
-        resp = self.send_request(self.problems[1].id, context_id=CONTEXT_ID)
+    def test_filter_by_context_source(self):
+        resp = self.send_request(self.problems[1].id, context_source=CONTEXT_SOURCE)
 
         self.assert200(resp)
 
@@ -249,18 +247,6 @@ class TestAPIProblemSubmission(TestCase):
 
         run = data['data'][0]
         self.assertEqual(run.get('id'), self.run1.id)
-
-    def test_filter_by_context_source(self):
-        resp = self.send_request(self.problems[2].id, context_source=CONTEXT_SOURCE)
-
-        self.assert200(resp)
-
-        data = resp.get_json()
-        self.assertEqual(data['result'], 'success')
-        self.assertEqual(len(data['data']), 1)
-
-        run = data['data'][0]
-        self.assertEqual(run.get('id'), self.run2.id)
 
     def test_filter_by_visibillity(self):
         resp = self.send_request(self.problems[1].id, show_hidden=True)
@@ -272,8 +258,8 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(len(data['data']), 3)
 
     def test_complex_context_filter(self):
-        resp = self.send_request(self.problems[2].id,
-                                 context_id=CONTEXT_ID,
+        resp = self.send_request(self.problems[1].id,
+                                 statement_id=self.run1.statement_id,
                                  context_source=CONTEXT_SOURCE,
                                  show_hidden=True)
         self.assert200(resp)
@@ -281,6 +267,3 @@ class TestAPIProblemSubmission(TestCase):
         data = resp.get_json()
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
-
-        run = data['data'][0]
-        self.assertEqual(run.get('id'), self.run2.id)

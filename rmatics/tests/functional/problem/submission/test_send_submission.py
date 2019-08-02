@@ -7,6 +7,7 @@ from rmatics.model import Run
 from rmatics.model.base import db
 from rmatics.model.user import SimpleUser
 from rmatics.testutils import TestCase
+from rmatics.view.problem.problem import DEFAULT_MOODLE_CONTEXT_SOURCE
 
 
 class TestAPIProblemSubmission(TestCase):
@@ -25,7 +26,6 @@ class TestAPIProblemSubmission(TestCase):
         db.session.add_all([self.user1, self.user2])
 
         db.session.flush()
-
         db.session.commit()
 
         self.SOURCE_HASH = 'source-hash'
@@ -54,7 +54,6 @@ class TestAPIProblemSubmission(TestCase):
         is_visible = True
 
         payload = {
-            'context_id': context_id,
             'context_source': self.CONTEXT_SOURCE,
             'is_visible': is_visible,
         }
@@ -67,10 +66,32 @@ class TestAPIProblemSubmission(TestCase):
 
         run_id = data.get('run_id')
         self.assertIsNotNone(run_id)
-
         run = db.session.query(Run).get(run_id)
         self.assertIsNotNone(run)
 
-        self.assertEqual(run.context_id, context_id)
         self.assertEqual(run.context_source, self.CONTEXT_SOURCE)
         self.assertEqual(run.is_visible, is_visible)
+
+    def test_submittion_missing_context(self):
+        resp = self.send_request(self.ejudge_problems[1].id)
+        self.assert200(resp)
+        data = resp.json.get('data')
+        run_id = data.get('run_id')
+
+        run = db.session.query(Run).get(run_id)
+        self.assertEqual(run.context_source, DEFAULT_MOODLE_CONTEXT_SOURCE)
+        self.assertEqual(run.is_visible, True)
+
+    def test_submittion_with_random_statement(self):
+        statement_id = 10
+        resp = self.send_request(self.ejudge_problems[1].id, **{
+            'statement_id': statement_id
+        })
+        self.assert200(resp)
+        data = resp.json.get('data')
+        run_id = data.get('run_id')
+
+        run = db.session.query(Run).get(run_id)
+        self.assertEqual(run.context_source, DEFAULT_MOODLE_CONTEXT_SOURCE)
+        self.assertEqual(run.statement_id, statement_id)
+        self.assertEqual(run.is_visible, True)
