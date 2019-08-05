@@ -35,9 +35,9 @@ class TrustedSubmitApi(MethodView):
         'statement_id': fields.Integer(),
         'user_id': fields.Integer(required=True),
 
-        # Submittion context arguments.
-        # By default all submittion context parameters are optional
-        # to preserve backward compatibillity with Moodle handlers
+        # Submission context arguments.
+        # By default all submission context parameters are optional
+        # to preserve backward compatibility with Moodle handlers
         'context_source': fields.Integer(required=False, missing=DEFAULT_MOODLE_CONTEXT_SOURCE),
         'is_visible': fields.Boolean(required=False, missing=True),
     }

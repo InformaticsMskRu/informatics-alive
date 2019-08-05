@@ -26,7 +26,6 @@ class TestAPIProblemSubmission(TestCase):
         db.session.add_all([self.user1, self.user2])
         db.session.flush()
 
-        # Runs 1-3 have the same statement_id
         self.run1 = Run(user_id=self.user1.id, problem_id=self.problems[1].id,
                         ejudge_status=0, ejudge_language_id=1, is_visible=True)
         self.run2 = Run(user_id=self.user1.id, problem_id=self.problems[2].id,
@@ -53,6 +52,7 @@ class TestAPIProblemSubmission(TestCase):
         db.session.add(user_group)
 
         db.session.commit()
+        pass
 
     def send_request(self, problem_id: int, **kwargs):
         route = url_for('problem.problem_submissions', problem_id=problem_id)
@@ -248,7 +248,7 @@ class TestAPIProblemSubmission(TestCase):
         run = data['data'][0]
         self.assertEqual(run.get('id'), self.run1.id)
 
-    def test_filter_by_visibillity(self):
+    def test_filter_by_visibility(self):
         resp = self.send_request(self.problems[1].id, show_hidden=True)
 
         self.assert200(resp)
@@ -256,6 +256,14 @@ class TestAPIProblemSubmission(TestCase):
         data = resp.get_json()
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 3)
+
+        # Should not include hidden runs, if not specified
+        resp = self.send_request(self.problems[1].id)
+        self.assert200(resp)
+
+        data = resp.get_json()
+        self.assertEqual(data['result'], 'success')
+        self.assertEqual(len(data['data']), 2)
 
     def test_complex_context_filter(self):
         resp = self.send_request(self.problems[1].id,
