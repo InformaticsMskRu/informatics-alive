@@ -284,9 +284,13 @@ class ProblemSubmissionsFilterApi(MethodView):
         if problem_id_filter_smt is not None:
             query = query.filter(problem_id_filter_smt)
 
-        # apply context filters
+        # Apply context filters
         if context_source is not None:
             query = query.filter(Run.context_source == context_source)
+
+        # If no visibility context supplied or explicitly set to False,
+        # assume it's Moodle request and return only public submissions.
+        # Otherwise, return ALL submissions
         if show_hidden is False:
             query = query.filter(Run.is_visible == true())
 
