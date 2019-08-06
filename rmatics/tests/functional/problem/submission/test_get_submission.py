@@ -9,6 +9,8 @@ from rmatics.model.user import SimpleUser
 from rmatics.testutils import TestCase
 
 CONTEXT_SOURCE = 10
+CONTEXT_ID_1 = 1
+CONTEXT_ID_2 = 2
 
 
 class TestAPIProblemSubmission(TestCase):
@@ -41,6 +43,13 @@ class TestAPIProblemSubmission(TestCase):
 
         # Context tests fixtures
         self.run1.context_source = CONTEXT_SOURCE
+        self.run5.context_source = CONTEXT_SOURCE
+
+        self.run1.statement_id = CONTEXT_ID_1
+        self.run3.statement_id = CONTEXT_ID_1
+        self.run5.statement_id = CONTEXT_ID_1
+        self.run2.statement_id = CONTEXT_ID_2
+        self.run4.statement_id = CONTEXT_ID_2
 
         db.session.add_all([self.run1, self.run2, self.run3, self.run4, self.run5])
 
@@ -160,7 +169,7 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(len(data['data']), 2)
 
     def test_filter_by_statement(self):
-        resp = self.send_request(self.problems[1].id, statement_id=self.run1.statement_id)
+        resp = self.send_request(self.problems[1].id, statement_id=CONTEXT_ID_1)
 
         self.assert200(resp)
 
@@ -274,4 +283,4 @@ class TestAPIProblemSubmission(TestCase):
 
         data = resp.get_json()
         self.assertEqual(data['result'], 'success')
-        self.assertEqual(len(data['data']), 1)
+        self.assertEqual(len(data['data']), 2)
