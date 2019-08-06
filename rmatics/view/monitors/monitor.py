@@ -181,7 +181,7 @@ problem_based_get_args = {
     'time_after': fields.Integer(missing=None),
 
     # Internal context scope arguments
-    'statement_id': fields.Integer(required=False),
+    'context_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
     'show_hidden': fields.Boolean(required=False),
 }
@@ -201,7 +201,7 @@ class ProblemBasedMonitorAPIView(MethodView):
         time_after = args['time_after']
 
         # Context arguments
-        statement_id = args.get('statement_id')
+        context_id = args.get('context_id')
         context_source = args.get('context_source')
         show_hidden = args.get('show_hidden')
 
@@ -212,7 +212,7 @@ class ProblemBasedMonitorAPIView(MethodView):
                             time_before=time_before,
                             time_after=time_after,
 
-                            statement_id=statement_id,
+                            context_id=context_id,
                             context_source=context_source,
                             show_hidden=show_hidden, )
             problem_runs.append(ProblemBasedMonitorData(problem_id, runs))

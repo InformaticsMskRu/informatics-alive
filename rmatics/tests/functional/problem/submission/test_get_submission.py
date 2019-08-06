@@ -244,6 +244,16 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(data['result'], 'success')
         self.assertEqual(len(data['data']), 1)
 
+    def test_filter_by_context_id(self):
+        resp = self.send_request(self.problems[1].id, context_id=CONTEXT_ID_1)
+
+        self.assert200(resp)
+
+        data = resp.get_json()
+        self.assertEqual(data['result'], 'success')
+        self.assertEqual(len(data['data']), 2)
+
+
     def test_filter_by_context_source(self):
         resp = self.send_request(self.problems[1].id, context_source=CONTEXT_SOURCE)
 
@@ -255,6 +265,8 @@ class TestAPIProblemSubmission(TestCase):
 
         run = data['data'][0]
         self.assertEqual(run.get('id'), self.run1.id)
+
+
 
     def test_filter_by_visibility(self):
         resp = self.send_request(self.problems[1].id, show_hidden=True)
