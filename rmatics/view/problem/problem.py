@@ -170,7 +170,7 @@ get_args = {
 # TODO: only teacher
 class ProblemSubmissionsFilterApi(MethodView):
     """ View for getting problem submissions
-Possible filters
+        Possible filters
         ----------------
         from_timestamp: timestamp
         to_timestamp: timestamp
