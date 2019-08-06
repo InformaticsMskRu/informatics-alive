@@ -5,17 +5,16 @@ from flask import (
     request,
 )
 from flask import jsonify as flask_jsonify
-from sqlalchemy.orm import Load
-from werkzeug.exceptions import BadRequest, NotFound
 from flask.views import MethodView
+from marshmallow import fields
+from sqlalchemy import desc, true
+from sqlalchemy.orm import Load
+from webargs.flaskparser import parser
+from werkzeug.exceptions import BadRequest, NotFound
+
 from rmatics.ejudge.submit_queue import (
-    get_last_get_id,
     queue_submit,
 )
-from sqlalchemy import desc
-from webargs.flaskparser import parser
-from marshmallow import fields
-
 from rmatics.model import CourseModule
 from rmatics.model.base import db
 from rmatics.model.group import UserGroup
@@ -24,9 +23,10 @@ from rmatics.model.run import Run
 from rmatics.model.user import SimpleUser
 from rmatics.utils.response import jsonify
 from rmatics.view import get_problems_by_statement_id
+from rmatics.view.problem.serializers.problem import ProblemSchema
 from rmatics.view.problem.serializers.run import RunSchema
 
-from rmatics.view.problem.serializers.problem import ProblemSchema
+DEFAULT_MOODLE_CONTEXT_SOURCE = 10
 
 
 class TrustedSubmitApi(MethodView):
@@ -34,6 +34,12 @@ class TrustedSubmitApi(MethodView):
         'lang_id': fields.Integer(required=True),
         'statement_id': fields.Integer(),
         'user_id': fields.Integer(required=True),
+
+        # Submission context arguments.
+        # By default all submission context parameters are optional
+        # to preserve backward compatibility with Moodle handlers
+        'context_source': fields.Integer(required=False, missing=DEFAULT_MOODLE_CONTEXT_SOURCE),
+        'is_visible': fields.Boolean(required=False, missing=True),
     }
 
     @staticmethod
@@ -63,6 +69,11 @@ class TrustedSubmitApi(MethodView):
         user_id = args.get('user_id')
         file = parser.parse_files(request, 'file', 'file')
 
+        # If context parameters are unavialable,
+        # consider it as Moodle submission and set defaults
+        context_source = args.get('context_source', DEFAULT_MOODLE_CONTEXT_SOURCE)
+        is_visible = args.get('is_visible', True)
+
         # Здесь НЕЛЬЗЯ использовать .get(problem_id), см EjudgeProblem.__doc__
         problem = db.session.query(EjudgeProblem) \
             .filter_by(id=problem_id) \
@@ -86,7 +97,7 @@ class TrustedSubmitApi(MethodView):
                 duplicate.ejudge_language_id == language_id:
             raise BadRequest('Source file is duplicate of your previous submission')
 
-        # TODO: разобраться, есть ли там constraint на statement_id
+        # There is not constraint on statement_id
         run = Run(
             user_id=user_id,
             problem_id=problem_id,
@@ -95,6 +106,10 @@ class TrustedSubmitApi(MethodView):
             ejudge_language_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
+
+            # Context related properties
+            context_source=context_source,
+            is_visible=is_visible,
         )
 
         db.session.add(run)
@@ -138,6 +153,10 @@ get_args = {
     'page': fields.Integer(required=True),
     'from_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
     'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
+
+    # Internal context scope arguments
+    'context_source': fields.Integer(required=False),
+    'show_hidden': fields.Boolean(required=False, missing=False, default=False),
 }
 
 
@@ -166,6 +185,7 @@ class ProblemSubmissionsFilterApi(MethodView):
         If problem_id = 0 we are trying to find problems by
         CourseModule == statement_id
     """
+
     def get(self, problem_id: int):
 
         args = parser.parse(get_args, request)
@@ -192,12 +212,11 @@ class ProblemSubmissionsFilterApi(MethodView):
         schema = RunSchema(many=True)
         data = schema.dump(runs)
 
-        return flask_jsonify(
-            {
-                'result': 'success',
-                'data': data.data,
-                'metadata': metadata
-            })
+        return flask_jsonify({
+            'result': 'success',
+            'data': data.data,
+            'metadata': metadata
+        })
 
     @classmethod
     def _build_query_by_args(cls, args, problem_id):
@@ -211,11 +230,15 @@ class ProblemSubmissionsFilterApi(MethodView):
         from_timestamp = args.get('from_timestamp')
         to_timestamp = args.get('to_timestamp')
 
+        # Context arguments
+        context_source = args.get('context_source')
+        show_hidden = args.get('show_hidden')
+
         try:
             from_timestamp = from_timestamp and from_timestamp != -1 and \
-                             datetime.datetime.fromtimestamp(from_timestamp / 1_000)
+                datetime.datetime.fromtimestamp(from_timestamp / 1_000)
             to_timestamp = to_timestamp and to_timestamp != -1 and \
-                           datetime.datetime.fromtimestamp(to_timestamp / 1_000)
+                datetime.datetime.fromtimestamp(to_timestamp / 1_000)
         except (OSError, OverflowError, ValueError):
             raise BadRequest('Bad timestamp data')
 
@@ -260,5 +283,15 @@ class ProblemSubmissionsFilterApi(MethodView):
             problem_id_filter_smt = Run.problem_id.in_(problem_ids)
         if problem_id_filter_smt is not None:
             query = query.filter(problem_id_filter_smt)
+
+        # Apply context filters
+        if context_source is not None:
+            query = query.filter(Run.context_source == context_source)
+
+        # If no visibility context supplied or explicitly set to False,
+        # assume it's Moodle request and return only public submissions.
+        # Otherwise, return ALL submissions
+        if show_hidden is False:
+            query = query.filter(Run.is_visible == true())
 
         return query
