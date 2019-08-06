@@ -61,7 +61,6 @@ class TestAPIProblemSubmission(TestCase):
         db.session.add(user_group)
 
         db.session.commit()
-        pass
 
     def send_request(self, problem_id: int, **kwargs):
         route = url_for('problem.problem_submissions', problem_id=problem_id)
