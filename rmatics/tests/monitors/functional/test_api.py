@@ -159,7 +159,7 @@ class TestProblemBasedMonitorGetApi(TestCase):
                  user_ids=user_ids,
                  time_before=time_before,
                  time_after=time_after,
-                 context_id=None,
+                 statement_id=None,
                  context_source=None,
                  show_hidden=None)
             for p in problem_ids

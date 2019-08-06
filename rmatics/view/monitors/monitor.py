@@ -26,7 +26,7 @@ ProblemBasedMonitorData = namedtuple('ProblemBasedMonitorData', ('problem_id', '
 @monitor_cacher
 def get_runs(problem_id: int = None, user_ids: Iterable = None,
              time_after: int = None, time_before: int = None,
-             context_id: int = None, context_source: int = None, show_hidden: bool = None):
+             statement_id: int = None, context_source: int = None, show_hidden: bool = False):
     """ We are using SQLAlchemy Сore to speedup multiply object fetching and serializing """
 
     query = select([LightWeightRun, LightWeightUser]) \
@@ -46,8 +46,8 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
         query = query.where(LightWeightRun.c.create_time < time_before)
 
     # apply context filters
-    if context_id is not None:
-        query = query.where(LightWeightRun.c.context_id == context_id)
+    if statement_id is not None:
+        query = query.where(LightWeightRun.c.statement_id == statement_id)
     if context_source is not None:
         query = query.where(LightWeightRun.c.context_source == context_source)
     if show_hidden is False:
@@ -82,10 +82,10 @@ contest_based_get_args = {
     'contest_id': fields.List(fields.Integer(), required=True),
     'time_before': fields.Integer(missing=None),
     'time_after': fields.Integer(missing=None),
-    # Internal context scope arguments
-    'context_id': fields.Integer(required=False),
+
+     # Internal context scope arguments
     'context_source': fields.Integer(required=False),
-    'show_hidden': fields.Boolean(required=False),
+    'show_hidden': fields.Boolean(required=False, missing=False),
 }
 
 
@@ -97,8 +97,8 @@ class ContestBasedMonitorAPIView(MethodView):
         group_id = args['group_id']
         time_before = args['time_before']
         time_after = args['time_after']
+
         # Context arguments
-        context_id = args.get('context_id')
         context_source = args.get('context_source')
         show_hidden = args.get('show_hidden')
 
@@ -128,7 +128,6 @@ class ContestBasedMonitorAPIView(MethodView):
                                 time_before=time_before,
                                 time_after=time_after,
                                 context_source=context_source,
-                                context_id=context_id,
                                 show_hidden=show_hidden
                                 )
                 monitor_data = ContestBasedMonitorData(contest_id, problem, runs)
@@ -180,8 +179,9 @@ problem_based_get_args = {
     'problem_id': fields.List(fields.Integer(), required=True),
     'time_before': fields.Integer(missing=None),
     'time_after': fields.Integer(missing=None),
+
     # Internal context scope arguments
-    'context_id': fields.Integer(required=False),
+    'statement_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
     'show_hidden': fields.Boolean(required=False),
 }
@@ -193,15 +193,15 @@ class ProblemBasedMonitorAPIView(MethodView):
     """
 
     def get(self):
-        # TODO: Приделать контекст посылки (NFRMTCS-192)
         args = parser.parse(problem_based_get_args, request)
 
         user_ids = args['user_id']
         problem_ids = args['problem_id']
         time_before = args['time_before']
         time_after = args['time_after']
+
         # Context arguments
-        context_id = args.get('context_id')
+        statement_id = args.get('statement_id')
         context_source = args.get('context_source')
         show_hidden = args.get('show_hidden')
 
@@ -211,8 +211,9 @@ class ProblemBasedMonitorAPIView(MethodView):
                             user_ids=user_ids,
                             time_before=time_before,
                             time_after=time_after,
+
+                            statement_id=statement_id,
                             context_source=context_source,
-                            context_id=context_id,
                             show_hidden=show_hidden, )
             problem_runs.append(ProblemBasedMonitorData(problem_id, runs))
 

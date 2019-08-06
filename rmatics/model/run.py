@@ -164,7 +164,7 @@ LightWeightRun = Table(
     db.Column('user_id', None, db.ForeignKey('moodle.mdl_user.id')),
     db.Column('problem_id', db.Integer),
     db.Column('create_time', db.DateTime),
-    db.Column('context_id', db.Integer),
+    db.Column('statement_id', db.Integer),
     db.Column('context_source', db.Integer),
     db.Column('is_visible', db.Boolean),
     schema='pynformatics'
