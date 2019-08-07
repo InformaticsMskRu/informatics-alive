@@ -38,7 +38,6 @@ class TestAPIProblemSubmission(TestCase):
                 mock.patch('rmatics.view.problem.problem.Run.update_source') as update_source:
             check_file_restriction.return_value = io.BytesIO(bytes((ascii('f') * 64 * 1024).encode('ascii')))
             generate_source_hash.return_value = self.SOURCE_HASH
-
             payload = {
                 'lang_id': 1,
                 'user_id': self.user1.id,
@@ -82,10 +81,10 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(run.context_source, DEFAULT_MOODLE_CONTEXT_SOURCE)
         self.assertEqual(run.is_visible, True)
 
-    def test_submittion_with_random_statement(self):
-        statement_id = 10
+    def test_submittion_with_random_context_id(self):
+        context_id = 10
         resp = self.send_request(self.ejudge_problems[1].id, **{
-            'statement_id': statement_id
+            'context_id': context_id
         })
         self.assert200(resp)
         data = resp.json.get('data')
@@ -93,5 +92,5 @@ class TestAPIProblemSubmission(TestCase):
 
         run = db.session.query(Run).get(run_id)
         self.assertEqual(run.context_source, DEFAULT_MOODLE_CONTEXT_SOURCE)
-        self.assertEqual(run.statement_id, statement_id)
+        self.assertEqual(run.statement_id, context_id)
         self.assertEqual(run.is_visible, True)

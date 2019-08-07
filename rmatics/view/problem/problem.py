@@ -38,6 +38,7 @@ class TrustedSubmitApi(MethodView):
         # Submission context arguments.
         # By default all submission context parameters are optional
         # to preserve backward compatibility with Moodle handlers
+        'context_id': fields.Integer(required=False),
         'context_source': fields.Integer(required=False, missing=DEFAULT_MOODLE_CONTEXT_SOURCE),
         'is_visible': fields.Boolean(required=False, missing=True),
     }
@@ -71,6 +72,7 @@ class TrustedSubmitApi(MethodView):
 
         # If context parameters are unavialable,
         # consider it as Moodle submission and set defaults
+        context_id = args.get('context_id')
         context_source = args.get('context_source', DEFAULT_MOODLE_CONTEXT_SOURCE)
         is_visible = args.get('is_visible', True)
 
@@ -111,6 +113,10 @@ class TrustedSubmitApi(MethodView):
             context_source=context_source,
             is_visible=is_visible,
         )
+        # If it's context aware submission,
+        # overwrite statement_id with context
+        if context_id:
+            run.statement_id = context_id
 
         db.session.add(run)
         db.session.flush()
@@ -155,6 +161,7 @@ get_args = {
     'to_timestamp': fields.Integer(),  # Может быть -1, тогда не фильтруем
 
     # Internal context scope arguments
+    'context_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
     'show_hidden': fields.Boolean(required=False, missing=False, default=False),
 }
@@ -163,7 +170,6 @@ get_args = {
 # TODO: only teacher
 class ProblemSubmissionsFilterApi(MethodView):
     """ View for getting problem submissions
-
         Possible filters
         ----------------
         from_timestamp: timestamp
@@ -231,14 +237,15 @@ class ProblemSubmissionsFilterApi(MethodView):
         to_timestamp = args.get('to_timestamp')
 
         # Context arguments
+        context_id = args.get('context_id')
         context_source = args.get('context_source')
         show_hidden = args.get('show_hidden')
 
         try:
             from_timestamp = from_timestamp and from_timestamp != -1 and \
-                datetime.datetime.fromtimestamp(from_timestamp / 1_000)
+                             datetime.datetime.fromtimestamp(from_timestamp / 1_000)
             to_timestamp = to_timestamp and to_timestamp != -1 and \
-                datetime.datetime.fromtimestamp(to_timestamp / 1_000)
+                           datetime.datetime.fromtimestamp(to_timestamp / 1_000)
         except (OSError, OverflowError, ValueError):
             raise BadRequest('Bad timestamp data')
 
@@ -285,9 +292,10 @@ class ProblemSubmissionsFilterApi(MethodView):
             query = query.filter(problem_id_filter_smt)
 
         # Apply context filters
+        if context_id is not None:
+            query = query.filter(Run.statement_id == context_id)
         if context_source is not None:
             query = query.filter(Run.context_source == context_source)
-
         # If no visibility context supplied or explicitly set to False,
         # assume it's Moodle request and return only public submissions.
         # Otherwise, return ALL submissions
