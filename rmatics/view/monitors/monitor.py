@@ -26,7 +26,7 @@ ProblemBasedMonitorData = namedtuple('ProblemBasedMonitorData', ('problem_id', '
 @monitor_cacher
 def get_runs(problem_id: int = None, user_ids: Iterable = None,
              time_after: int = None, time_before: int = None,
-             statement_id: int = None, context_source: int = None, show_hidden: bool = False):
+             context_id: int = None, context_source: int = None, show_hidden: bool = False):
     """ We are using SQLAlchemy Сore to speedup multiply object fetching and serializing """
 
     query = select([LightWeightRun, LightWeightUser]) \
@@ -46,8 +46,8 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
         query = query.where(LightWeightRun.c.create_time < time_before)
 
     # apply context filters
-    if statement_id is not None:
-        query = query.where(LightWeightRun.c.statement_id == statement_id)
+    if context_id is not None:
+        query = query.where(LightWeightRun.c.statement_id == context_id)
     if context_source is not None:
         query = query.where(LightWeightRun.c.context_source == context_source)
     if show_hidden is False:
