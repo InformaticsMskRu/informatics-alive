@@ -77,7 +77,7 @@ class DevConfig(BaseConfig):
 class TestConfig(BaseConfig):
     DEBUG = True
     TESTING = True
-    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ECHO = False
 
 
 class ProdConfig(BaseConfig):

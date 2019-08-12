@@ -26,7 +26,7 @@ ProblemBasedMonitorData = namedtuple('ProblemBasedMonitorData', ('problem_id', '
 @monitor_cacher
 def get_runs(problem_id: int = None, user_ids: Iterable = None,
              time_after: int = None, time_before: int = None,
-             statement_id: int = None, context_source: int = None, show_hidden: bool = False):
+             context_id: int = None, context_source: int = None, show_hidden: bool = False):
     """ We are using SQLAlchemy Сore to speedup multiply object fetching and serializing """
 
     query = select([LightWeightRun, LightWeightUser]) \
@@ -46,8 +46,8 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
         query = query.where(LightWeightRun.c.create_time < time_before)
 
     # apply context filters
-    if statement_id is not None:
-        query = query.where(LightWeightRun.c.statement_id == statement_id)
+    if context_id is not None:
+        query = query.where(LightWeightRun.c.statement_id == context_id)
     if context_source is not None:
         query = query.where(LightWeightRun.c.context_source == context_source)
     if show_hidden is False:
@@ -60,17 +60,17 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
 
     data = [
         {
-            'id': run[0],
+            'id': run[LightWeightRun.c.id],
             'user': {
-                'id': run[7],
-                'firstname': run[8],
-                'lastname': run[9]
+                'id': run[LightWeightUser.c.id],
+                'firstname': run[LightWeightUser.c.firstname],
+                'lastname': run[LightWeightUser.c.lastname]
             },
-            'problem_id': run[2],
-            'create_time': run[3].replace(tzinfo=UTC).strftime('%Y-%m-%dT%H:%M:%S%z'),
-            'ejudge_score': run[4],
-            'ejudge_status': run[5],
-            'ejudge_test_num': run[6],
+            'problem_id': run[LightWeightRun.c.problem_id],
+            'create_time': run[LightWeightRun.c.create_time].replace(tzinfo=UTC).strftime('%Y-%m-%dT%H:%M:%S%z'),
+            'ejudge_score': run[LightWeightRun.c.ej_score],
+            'ejudge_status': run[LightWeightRun.c.ej_status],
+            'ejudge_test_num': run[LightWeightRun.c.ej_test_num],
         }
         for run in result]
 
@@ -83,7 +83,7 @@ contest_based_get_args = {
     'time_before': fields.Integer(missing=None),
     'time_after': fields.Integer(missing=None),
 
-     # Internal context scope arguments
+    # Internal context scope arguments
     'context_source': fields.Integer(required=False),
     'show_hidden': fields.Boolean(required=False, missing=False),
 }

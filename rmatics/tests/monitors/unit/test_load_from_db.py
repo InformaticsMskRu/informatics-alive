@@ -1,7 +1,7 @@
 import datetime
 
+from dateutil.tz import UTC
 from mock import MagicMock
-from sqlalchemy import MetaData
 
 from rmatics import db
 from rmatics import monitor_cacher
@@ -10,7 +10,6 @@ from rmatics.model.monitor import MonitorStatement, Monitor
 from rmatics.testutils import TestCase
 from rmatics.view import get_problems_by_statement_id
 from rmatics.view.monitors.monitor import get_runs, ContestBasedMonitorAPIView
-
 
 MONITOR_GROUP_ID = 5
 
@@ -50,8 +49,8 @@ class TestLoadProblemsByCourseModule(TestCase):
 
     def test_get_problems_by_statement_cm(self):
         group_id, statement_ids = ContestBasedMonitorAPIView._get_contests(
-                self.course_module_statement.id
-            )
+            self.course_module_statement.id
+        )
         self.assertIsNone(group_id)
         self.assertEqual(statement_ids, [self.statements[0].id])
 
@@ -66,7 +65,7 @@ class TestLoadProblemsByCourseModule(TestCase):
 
     def test_get_monitor_statements(self):
         group_id, statement_ids = ContestBasedMonitorAPIView._get_contests(
-                self.course_module_monitor.id
+            self.course_module_monitor.id
         )
         expected_ids = {s.id for s in self.statements}
         self.assertEqual(group_id, MONITOR_GROUP_ID)
@@ -126,15 +125,21 @@ class TestGenerateMonitor(TestCase):
 
         self.assertEqual(len(serialized_runs), 3)
 
-        serialized_run = serialized_runs[0]
-        self.assertIn('user', serialized_run)
-
         run = self.runs[0]
-        user = serialized_run['user']
-        self.assertEqual(user.get('id'), run.user.id)
-        self.assertEqual(user.get('firstname'), run.user.firstname)
-        self.assertEqual(user.get('lastname'), run.user.lastname)
+        serialized_run = serialized_runs[0]
+        expected_run_time = run.create_time.replace(tzinfo=UTC).strftime('%Y-%m-%dT%H:%M:%S%z')
+        self.assertIn('user', serialized_run)
+        self.assertEqual(serialized_run.get('id'), run.id)
+        self.assertEqual(serialized_run.get('problem_id'), run.problem_id)
+        self.assertEqual(serialized_run.get('create_time'), expected_run_time)
+        self.assertEqual(serialized_run.get('ejudge_score'), run.ejudge_score)
+        self.assertEqual(serialized_run.get('ejudge_test_num'), run.ejudge_test_num)
 
+        user = run.user
+        serialized_user = serialized_run['user']
+        self.assertEqual(serialized_user.get('id'), user.id)
+        self.assertEqual(serialized_user.get('firstname'), user.firstname)
+        self.assertEqual(serialized_user.get('lastname'), user.lastname)
 
     def test_get_runs_before(self):
         time_creation = datetime.datetime.utcnow() + datetime.timedelta(days=1)
