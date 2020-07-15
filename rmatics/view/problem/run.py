@@ -100,6 +100,9 @@ class SourceApi(MethodView):
         args = parser.parse(self.get_args, request)
         is_admin = args.get('is_admin')
         user_id = args.get('user_id')
+        # if user_id == 399362 and not is_admin:
+        #     import random as rdm
+        #     return jsonify({'source': rdm.choice(['Нет', 'Отстань', 'Сори', 'Кончились', 'Попробуйте в другой раз', 'Ваш запрос очень важен для нас, оставайтесь на линии']), 'language_id': 2})
 
         run_q = db.session.query(Run)
         if not is_admin:

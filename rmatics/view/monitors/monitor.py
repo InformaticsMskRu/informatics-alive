@@ -64,7 +64,9 @@ def get_runs(problem_id: int = None, user_ids: Iterable = None,
             'user': {
                 'id': run[LightWeightUser.c.id],
                 'firstname': run[LightWeightUser.c.firstname],
-                'lastname': run[LightWeightUser.c.lastname]
+                'lastname': run[LightWeightUser.c.lastname],
+                'username': run[LightWeightUser.c.username],
+                'email': run[LightWeightUser.c.email]
             },
             'problem_id': run[LightWeightRun.c.problem_id],
             'create_time': run[LightWeightRun.c.create_time].replace(tzinfo=UTC).strftime('%Y-%m-%dT%H:%M:%S%z'),
@@ -176,7 +178,9 @@ class ContestBasedMonitorAPIView(MethodView):
 
 problem_based_get_args = {
     'user_id': fields.List(fields.Integer(), missing=None),
-    'problem_id': fields.List(fields.Integer(), required=True),
+    'uid': fields.List(fields.Integer(), missing=None),
+    'problem_id': fields.List(fields.Integer(), missing=None),
+    'pid': fields.List(fields.Integer(), missing=None),
     'time_before': fields.Integer(missing=None),
     'time_after': fields.Integer(missing=None),
 
@@ -196,7 +200,11 @@ class ProblemBasedMonitorAPIView(MethodView):
         args = parser.parse(problem_based_get_args, request)
 
         user_ids = args['user_id']
+        if not user_ids:
+            user_ids = args['uid']
         problem_ids = args['problem_id']
+        if not problem_ids:
+            problem_ids = args['pid']
         time_before = args['time_before']
         time_after = args['time_after']
 

@@ -58,7 +58,7 @@ class Run(db.Model):
     source_hash = db.Column(db.String(32))  # We are using md5 hex digest
 
     # Context fields
-    context_id = db.Column(db.Integer, nullable=True)
+    # context_id = db.Column(db.Integer, nullable=True)
     context_source = db.Column(db.Integer, nullable=True)
     # Run is visible by default
     is_visible = db.Column(db.Boolean, nullable=True, default=True)

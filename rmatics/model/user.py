@@ -122,5 +122,7 @@ LightWeightUser = Table(
     db.Column('id', db.Integer, primary_key=True),
     db.Column('firstname', db.Unicode(100)),
     db.Column('lastname', db.Unicode(100)),
+    db.Column('email', db.Unicode(100)),
+    db.Column('username', db.Unicode(100)),
     schema='moodle'
 )

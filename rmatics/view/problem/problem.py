@@ -1,4 +1,5 @@
 import datetime
+import base64
 
 from flask import (
     current_app,
@@ -84,8 +85,14 @@ class TrustedSubmitApi(MethodView):
         if not problem:
             raise NotFound('Problem with this id is not found')
 
+        if int(user_id) <= 0:
+            raise BadRequest('Wrong user status')
+
         try:
-            text = self.check_file_restriction(file)
+            limit = 64
+            if problem.output_only:
+                limit = 1024 * 16
+            text = self.check_file_restriction(file, limit)
         except ValueError as e:
             raise BadRequest(e.args[0])
         source_hash = Run.generate_source_hash(text)
@@ -164,6 +171,7 @@ get_args = {
     'context_id': fields.Integer(required=False),
     'context_source': fields.Integer(required=False),
     'show_hidden': fields.Boolean(required=False, missing=False, default=False),
+    'include_source': fields.Boolean(required=False, missing=False, default=False),
 }
 
 
@@ -196,8 +204,6 @@ class ProblemSubmissionsFilterApi(MethodView):
 
         args = parser.parse(get_args, request)
         query = self._build_query_by_args(args, problem_id)
-        query = query.options(Load(Problem).load_only('id', 'name'),
-                              Load(SimpleUser).load_only('id', 'firstname', 'lastname'))
 
         per_page_count = args.get('count')
         page = args.get('page')
@@ -205,10 +211,33 @@ class ProblemSubmissionsFilterApi(MethodView):
                                 error_out=False, max_per_page=100)
 
         runs = []
-        for run, user, problem in result.items:
-            run.user = user
-            run.problem = problem
-            runs.append(run)
+
+        problem_ids = set()
+        user_ids = set()
+
+        for run in result.items:
+            problem_ids.add(run.problem_id)
+            user_ids.add(run.user_id)
+
+        problems_result = db.session.query(Problem).filter(Problem.id.in_(problem_ids)).options(Load(Problem).load_only('id', 'name'))
+        problems = dict()
+
+        for problem in problems_result:
+            problems[problem.id] = problem
+
+        users_result = db.session.query(SimpleUser).filter(SimpleUser.id.in_(user_ids)).options(Load(SimpleUser).load_only('id', 'firstname', 'lastname'))
+        users = dict()
+
+        for u in users_result:
+            users[u.id] = u
+
+        for run in result.items:
+            if run.user_id > 0:
+                run.user = users[run.user_id]
+                run.problem = problems[run.problem_id]
+                if args.get('include_source'):
+                    run.code = base64.b64encode(run.source)
+                runs.append(run)
 
         metadata = {
             'count': result.total,
@@ -249,9 +278,7 @@ class ProblemSubmissionsFilterApi(MethodView):
         except (OSError, OverflowError, ValueError):
             raise BadRequest('Bad timestamp data')
 
-        query = db.session.query(Run, SimpleUser, Problem) \
-            .join(SimpleUser, SimpleUser.id == Run.user_id) \
-            .join(Problem, Problem.id == Run.problem_id) \
+        query = db.session.query(Run) \
             .order_by(desc(Run.id))
         if user_id:
             query = query.filter(Run.user_id == user_id)
@@ -262,7 +289,7 @@ class ProblemSubmissionsFilterApi(MethodView):
                 .filter(UserGroup.group_id == group_id) \
                 .subquery('user_subquery')
 
-            query = query.filter(SimpleUser.id == user_subquery.c.user_ids)
+            query = query.filter(Run.user_id == user_subquery.c.user_ids)
 
         if lang_id and lang_id > 0:
             query = query.filter(Run.ejudge_language_id == lang_id)
@@ -288,6 +315,9 @@ class ProblemSubmissionsFilterApi(MethodView):
             problems = get_problems_by_statement_id(statement_id)
             problem_ids = [problem.id for problem in problems]
             problem_id_filter_smt = Run.problem_id.in_(problem_ids)
+
+        if problem_id == 0 and not statement_id and not group_id and not user_id:
+            raise NotFound('You must specify at least problem_id or statement_id or group_id or user_id')
         if problem_id_filter_smt is not None:
             query = query.filter(problem_id_filter_smt)
 

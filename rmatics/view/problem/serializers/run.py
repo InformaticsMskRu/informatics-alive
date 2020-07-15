@@ -21,6 +21,7 @@ class RunSchema(Schema):
     ejudge_language_id = fields.Integer()
     ejudge_test_num = fields.Integer()
     ejudge_score = fields.Integer()
+    code = fields.String()
 
     @post_load
     def load_run_update(self, data: dict):

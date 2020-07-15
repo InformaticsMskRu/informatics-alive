@@ -45,6 +45,7 @@ def get_problems_by_statement_id(statement_id: int, filter_hidden=True) -> list:
     problems_statement_problems = db.session.query(Problem, StatementProblem) \
         .join(StatementProblem, StatementProblem.problem_id == Problem.id) \
         .filter(StatementProblem.statement_id == statement_id) \
+        .order_by(StatementProblem.rank) \
         .options(Load(Problem).load_only('id', 'name')) \
         .options(Load(StatementProblem).load_only('rank'))
 
