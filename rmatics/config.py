@@ -63,6 +63,7 @@ class BaseConfig:
 
     # services
     EJUDGE_NEW_CLIENT_URL = os.getenv('EJUDGE_NEW_CLIENT_URL', 'http://localhost/cgi-bin/new-client')
+    EJUDGE_MASTER_TOKEN = os.getenv('EJUDGE_MASTER_TOKEN', 'token')
     EJUDGE_USER = os.getenv('EJUDGE_USER', 'user')
     EJUDGE_PASSWORD = os.getenv('EJUDGE_PASSWORD', 'pass')
 
