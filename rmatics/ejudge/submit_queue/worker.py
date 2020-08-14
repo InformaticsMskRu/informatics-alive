@@ -13,7 +13,9 @@ class SubmitWorker(Greenlet):
         self.ejudge_url = None
 
     def handle_submit(self):
+        current_app.logger.info('Try get from queue')
         submit = self.queue.get()
+        current_app.logger.info('Got')
         try:
             submit.send(ejudge_url=self.ejudge_url)
         except sa_exc.OperationalError:

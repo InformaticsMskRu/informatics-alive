@@ -204,7 +204,6 @@ class ProblemSubmissionsFilterApi(MethodView):
 
         args = parser.parse(get_args, request)
         query = self._build_query_by_args(args, problem_id)
-
         per_page_count = args.get('count')
         page = args.get('page')
         result = query.paginate(page=page, per_page=per_page_count,

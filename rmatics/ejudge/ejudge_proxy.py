@@ -2,6 +2,7 @@ import codecs
 import requests
 import re
 import json
+from flask import current_app
 
 DEFAULT_ERROR_STR = 'Ошибка отправки задачи'
 
@@ -27,48 +28,41 @@ def report_error(code, login_data, submit_data, file, filename, user_id, addon =
 
 
 def submit(run_file, contest_id, prob_id, lang_id, login, password, filename, url):
-    login_data = {
-        'contest_id' : contest_id,
-        'role' : '0',
-        'login' : login,
-        'password' : password,
-        'locale_id' : '1',
-    }
-
-    c = requests.post(url, data = login_data)
-    res = re.search('SID="([^"]*)";', c.text)
-
-    if (res):
-        SID = res.group(1)
-    else:
-        return {
-            'code': None,
-            'message': DEFAULT_ERROR_STR
-        }
-
-    cookies = c.cookies
     files = {'file' : (filename, run_file)}
 
     submit_data = {
-        'SID' : SID,
-        'prob_id' : prob_id,
         'lang_id' : lang_id,
-        'action_40' : 'action_40',
-        'json' : 1,
+        'action' : 'submit-run',
+        'problem': prob_id,
+        'prob_id': prob_id,
+        'sender_user_id': 5,
+        'contest_id': contest_id,
     }
 
-    c = requests.post(url, data=submit_data, cookies=cookies, files=files)
+    headers = {
+        'Authorization': 'Bearer ' + current_app.config.get('EJUDGE_MASTER_TOKEN')
+    }
 
-    resp = json.loads(c.text)
+    current_app.logger.info('Request {}'.format(submit_data))
 
-    if 'run_id' in resp:
+    c = requests.put(url, data=submit_data, headers=headers, files=files)
+
+    text_response = str(c.text)
+
+    current_app.logger.info('Response {}'.format(text_response))
+
+    resp = json.loads(text_response)
+
+    if resp['ok']:
         return {
             'code': 0,
             'message': STATUS_REPR[0],
-            **resp
+            **resp['result']
         }
 
-    code = resp["error_code"]
+    current_app.logger.info('{} {}'.format(c.status_code, text_response))
+
+    code = resp["error"]["num"]
     if code in STATUS_REPR:
         return {
             'code': code,
@@ -81,7 +75,7 @@ def submit(run_file, contest_id, prob_id, lang_id, login, password, filename, ur
         }
     else:
         return {
-            'code': None,
-            'message': DEFAULT_ERROR_STR + " (" + str(code) + ")",
+            'code': code,
+            'message': DEFAULT_ERROR_STR + " (" + str(code) + " " + resp["error"]["message"] +  ")",
         }
 

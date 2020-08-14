@@ -1,6 +1,7 @@
 import pickle
 
 from rmatics.model.base import redis
+from flask import current_app
 
 
 class RedisQueue:
@@ -10,7 +11,7 @@ class RedisQueue:
     def put(self, value, pipe=None):
         if pipe is None:
             pipe = redis
-
+        current_app.logger.info('rpush {} {}'.format(self.key, pickle.dumps(value)))
         pipe.rpush(self.key, pickle.dumps(value))
 
     def get(self, pipe=None):
