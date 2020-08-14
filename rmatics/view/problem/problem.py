@@ -232,7 +232,8 @@ class ProblemSubmissionsFilterApi(MethodView):
 
         for run in result.items:
             if run.user_id > 0:
-                run.user = users[run.user_id]
+                if run.user_id in users:
+                    run.user = users[run.user_id]
                 run.problem = problems[run.problem_id]
                 if args.get('include_source'):
                     run.code = base64.b64encode(run.source)
