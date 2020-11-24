@@ -122,6 +122,7 @@ class EjudgeProblem(Problem):
             attr: getattr(self, attr, 'undefined')
             for attr in attrs
         }
+        problem_dict['content'] = problem_dict['content'].replace("\\)", "$").replace("\\(", "$")
         # problem_dict['languages'] = context.get_allowed_languages()
         return problem_dict
 

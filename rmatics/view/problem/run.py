@@ -84,6 +84,11 @@ class RunAPI(MethodView):
             run.move_protocol_to_rejudge_collection(rejudge.id)
 
         queue_submit(run.id, run.ejudge_url)
+
+        run.ejudge_status = 377
+        run.ejudge_test_num = None
+        run.ejudge_score = None
+        db.session.add(run)
         db.session.commit()
 
         return jsonify({})

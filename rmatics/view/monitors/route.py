@@ -4,7 +4,7 @@ from rmatics.view.monitors.monitor import ContestBasedMonitorAPIView, ProblemBas
 
 monitor_blueprint = Blueprint('monitor', __name__, url_prefix='/monitor')
 
-monitor_blueprint.add_url_rule('/', methods=('GET', ),
+monitor_blueprint.add_url_rule('/', methods=('GET', 'POST'),
                                view_func=ContestBasedMonitorAPIView.as_view('crud'))
 
 

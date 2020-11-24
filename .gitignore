@@ -52,6 +52,8 @@ Temporary Items
 .idea/**/dynamic.xml
 .idea/**/uiDesigner.xml
 .idea/**/dbnavigator.xml
+rmatics/docs/
+ansible/hosts
 
 # Gradle
 .idea/**/gradle.xml

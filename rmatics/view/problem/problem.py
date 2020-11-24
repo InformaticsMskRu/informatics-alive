@@ -1,6 +1,6 @@
 import datetime
 import base64
-
+from dateutil.tz import UTC
 from flask import (
     current_app,
     request,
@@ -201,9 +201,15 @@ class ProblemSubmissionsFilterApi(MethodView):
     """
 
     def get(self, problem_id: int):
+        return self.process(problem_id, [])
 
+    def post(self, problem_id: int):
+        user_ids = request.json["user_ids"]
+        return self.process(problem_id, user_ids)
+
+    def process(self, problem_id: int, user_ids):
         args = parser.parse(get_args, request)
-        query = self._build_query_by_args(args, problem_id)
+        query = self._build_query_by_args(args, problem_id, user_ids)
         per_page_count = args.get('count')
         page = args.get('page')
         result = query.paginate(page=page, per_page=per_page_count,
@@ -254,7 +260,7 @@ class ProblemSubmissionsFilterApi(MethodView):
         })
 
     @classmethod
-    def _build_query_by_args(cls, args, problem_id):
+    def _build_query_by_args(cls, args, problem_id, user_ids = []):
         user_id = args.get('user_id')
         group_id = args.get('group_id')
         lang_id = args.get('lang_id')
@@ -290,6 +296,9 @@ class ProblemSubmissionsFilterApi(MethodView):
                 .subquery('user_subquery')
 
             query = query.filter(Run.user_id == user_subquery.c.user_ids)
+
+        if user_ids:
+            query = query.filter(Run.user_id.in_(user_ids))
 
         if lang_id and lang_id > 0:
             query = query.filter(Run.ejudge_language_id == lang_id)

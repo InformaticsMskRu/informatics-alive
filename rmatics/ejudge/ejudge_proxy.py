@@ -50,8 +50,11 @@ def submit(run_file, contest_id, prob_id, lang_id, login, password, filename, ur
     text_response = str(c.text)
 
     current_app.logger.info('Response {}'.format(text_response))
-
-    resp = json.loads(text_response)
+    try:
+        resp = json.loads(text_response)
+    except:
+        current_app.logger.info('{} {}'.format(c.status_code, text_response))
+        raise
 
     if resp['ok']:
         return {

@@ -1,4 +1,5 @@
 import datetime
+import json
 from collections import namedtuple, OrderedDict
 from typing import Iterable, Tuple, Optional
 
@@ -94,7 +95,24 @@ contest_based_get_args = {
 class ContestBasedMonitorAPIView(MethodView):
     def get(self):
         args = parser.parse(contest_based_get_args, request)
+        group_id = args['group_id']
 
+        if group_id:
+            users = db.session.query(SimpleUser) \
+                .join(UserGroup, UserGroup.user_id == SimpleUser.id) \
+                .filter(UserGroup.group_id == group_id)
+            user_ids = [user.id for user in users]
+        else:
+            user_ids = None
+
+        return self._process(args, user_ids)
+
+    def post(self):
+        args = parser.parse(contest_based_get_args, request)
+        user_ids = request.json["user_ids"]
+        return self._process(args, user_ids)
+
+    def _process(self, args, user_ids):
         course_module_ids = args['contest_id']
         group_id = args['group_id']
         time_before = args['time_before']
@@ -109,14 +127,6 @@ class ContestBasedMonitorAPIView(MethodView):
             monitor_group_id, statement_ids = self._get_contests(cm_id)
             contest_ids += statement_ids
             group_id = group_id or monitor_group_id
-
-        if group_id:
-            users = db.session.query(SimpleUser) \
-                .join(UserGroup, UserGroup.user_id == SimpleUser.id) \
-                .filter(UserGroup.group_id == group_id)
-            user_ids = [user.id for user in users]
-        else:
-            user_ids = None
 
         contest_problems = OrderedDict()
         for contest_id in contest_ids:
