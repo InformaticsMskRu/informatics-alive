@@ -6,7 +6,7 @@ import requests
 
 engine = create_engine('mysql+pymysql://localhost/')
 
-row = list(engine.execute("select id from pynformatics.runs where ej_status=377 and id > 24789179 order by id desc limit 1000"))
+row = list(engine.execute("select id from pynformatics.runs where ej_status=520 and create_time > '2022-10-14 20:44:23' and ej_contest_id = 1992;"))
 
 for e in row:
     r = requests.post("http://localhost:12346/problem/run/{}/action/rejudge".format(e[0]))

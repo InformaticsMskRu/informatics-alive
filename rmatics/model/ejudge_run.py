@@ -214,7 +214,7 @@ class EjudgeRun(db.Model):
             self.status_string = rep.getAttribute('status')
 
             compiler_output_elements = self.xml.getElementsByTagName('compiler_output')
-            if compiler_output_elements:
+            if compiler_output_elements and self.status_string == "CE":
                 self.compiler_output = getattr(compiler_output_elements[0].firstChild, 'nodeValue', '')
 
             host_elements = self.xml.getElementsByTagName('host')

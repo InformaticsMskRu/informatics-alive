@@ -45,7 +45,7 @@ def submit(run_file, contest_id, prob_id, lang_id, login, password, filename, ur
 
     current_app.logger.info('Request {}'.format(submit_data))
 
-    c = requests.put(url, data=submit_data, headers=headers, files=files)
+    c = requests.put(url, data=submit_data, headers=headers, files=files, stream=False)
 
     text_response = str(c.text)
 
