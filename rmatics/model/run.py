@@ -205,6 +205,8 @@ def unmarshal_protocol(p) -> Optional[dict]:
         p["judge_resp"] = p["ejResp"]
     if "a" in p:
         p["audit"] = p["a"]
+    p["v"] = 2
+    return p
 
     def fill(t, field, typ):
         if field in t:

@@ -40,7 +40,7 @@ _str_code_status_map = {
     "OK": EjudgeStatuses.OK.value,
     "WA": EjudgeStatuses.WA.value,
     "ML": EjudgeStatuses.ML.value,
-    "SE": EjudgeStatuses.SECURITY_ERROR.valus,
+    "SE": EjudgeStatuses.SECURITY_ERROR.value,
     "CF": EjudgeStatuses.CF.value,
     "PE": EjudgeStatuses.PE.value,
     "RT": EjudgeStatuses.RE.value,
