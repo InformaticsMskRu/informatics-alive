@@ -34,7 +34,36 @@ class EjudgeStatuses(Enum):
     COMPILING = 98
     IN_QUEUE = 377
     RMATICS_SUBMIT_ERROR = 520
+    UNKOWN = 521
 
+_str_code_status_map = {
+    "OK": EjudgeStatuses.OK.value,
+    "WA": EjudgeStatuses.WA.value,
+    "ML": EjudgeStatuses.ML.value,
+    "SE": EjudgeStatuses.SECURITY_ERROR.valus,
+    "CF": EjudgeStatuses.CF.value,
+    "PE": EjudgeStatuses.PE.value,
+    "RT": EjudgeStatuses.RE.value,
+    "TL": EjudgeStatuses.TL.value,
+    "WT": EjudgeStatuses.WALL_TIME_LIMIT_EXCEEDED.value,
+    "SK": EjudgeStatuses.SKIPPED.value,
+}
+
+_status_map_str = {v: k for k, v in _str_code_status_map}
+
+def get_status_from_string_code(code: str):
+    if code in _str_code_status_map:
+        return _str_code_status_map[code]
+    return EjudgeStatuses.UNKOWN.value
+
+def get_string_code(status):
+    if status in _status_map_str:
+        return _status_map_str[status]
+    return "UNKOWN"
+
+def get_full_string_code(status):
+    code = get_string_code(status)
+    return get_string_status(code)
 
 def read_file_unknown_encoding(file_name, size=255):
     try:
@@ -124,7 +153,8 @@ def get_string_status(s):
         "RT": "Ошибка во время выполнения программы",
         "TL": "Превышено максимальное время работы",
         "WT": "Превышено максимальное общее время работы",
-        "SK": "Пропущено"
+        "SK": "Пропущено",
+        "UNKOWN": "Unkown",
     }[s]
 
 

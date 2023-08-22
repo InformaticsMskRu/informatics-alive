@@ -69,12 +69,14 @@ class Submit:
 
         :return: Protocol for invalid submition
         """
-        return {
-            'tests': {},
+
+        r = {
             'compiler_output': ejudge_respone,
-            'audit': None,
-            'run_id': self.run_id
+            'run_id': self.run_id,
         }
+        if len(ejudge_respone) > 0:
+            r["ejResp"] = ejudge_respone
+        return r
 
     def send(self, ejudge_url=None):
         current_app.logger.info(f'Trying to send run #{self.run_id} to ejudge')

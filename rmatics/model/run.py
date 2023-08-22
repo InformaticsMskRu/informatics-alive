@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from flask import g
+from rmatics.utils.run import get_string_code, get_full_string_code
 from sqlalchemy import MetaData, Table
 
 from rmatics.model.base import db, mongo
@@ -77,7 +78,7 @@ class Run(db.Model):
         protocol = mongo.db.protocol.find_one({'run_id': self.id})
         if protocol:
             del protocol['_id']
-            protocol['rejudge_id'] = rejudge_id
+            protocol['rjdgId'] = rejudge_id
             mongo.db.rejudge.insert_one(protocol)
             mongo.db.protocol.find_one_and_delete({'run_id': self.id})
 
@@ -92,7 +93,8 @@ class Run(db.Model):
 
     @property
     def protocol(self) -> Optional[dict]:
-        return mongo.db.protocol.find_one({'run_id': self.id}, {'_id': False})
+        p = mongo.db.protocol.find_one({'run_id': self.id}, {'_id': False})
+        return unmarshal_protocol(p)
 
     @protocol.setter
     def protocol(self, protocol_source: dict):
@@ -174,3 +176,37 @@ LightWeightRun = Table(
     db.Column('is_visible', db.Boolean),
     schema='pynformatics'
 )
+
+
+def unmarshal_protocol(p) -> Optional[dict]:
+    if "t" in p:
+        p["tests"] = {test_number: {
+            "input": fill(t, "i", str),
+            "big_input" : fill(t, "bi", bool),
+            "corr" : fill(t, "c", str),
+            "big_corr" : fill(t, "bc", bool),
+            "status" : get_string_code(t["s"] if "s" in t else None),
+            "string_status" : fill_str_status(t),
+            "real_time" : fill(t, "rt", int),
+            "time" : fill(t, "t", int),
+            "max_memory_used" : fill(t, "t", int),
+            "big_output" : fill(t, "bo", bool),
+            "output" : fill(t, "o", str),
+            "checker_output" : fill(t, "co", str),
+            "error_output" : fill(t, "eo", str),
+            "extra" : fill(t, "e", str),
+        } for test_number, t in p["t"]}
+        del p["t"]
+    if "tests" not in p:
+        p["tests"] = {}
+    if "c" in p:
+        p["compiler_output"] = p["c"]
+    if "ejResp" in p:
+        p["judge_resp"] = p["ejResp"]
+    if "a" in p:
+        p["audit"] = p["a"]
+
+    def fill(t, field, typ):
+        if field in t:
+            return typ(t[field])
+        return typ()
