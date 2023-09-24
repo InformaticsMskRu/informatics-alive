@@ -5,6 +5,7 @@ from marshmallow import fields, Schema, post_load
 from pymongo.errors import PyMongoError, DuplicateKeyError
 from webargs.flaskparser import parser
 from werkzeug.exceptions import NotFound, BadRequest, InternalServerError
+from sqlalchemy import or_
 
 from rmatics.ejudge.submit_queue import queue_submit
 from rmatics.model.base import db, mongo
@@ -99,18 +100,20 @@ class SourceApi(MethodView):
     get_args = {
         'is_admin': fields.Boolean(default=False, missing=False),
         'user_id': fields.Integer(),
+        'context_source': fields.Integer(default=0),
     }
 
     def get(self, run_id: int):
         args = parser.parse(self.get_args, request)
         is_admin = args.get('is_admin')
         user_id = args.get('user_id')
-        # if user_id == 399362 and not is_admin:
-        #     import random as rdm
-        #     return jsonify({'source': rdm.choice(['Нет', 'Отстань', 'Сори', 'Кончились', 'Попробуйте в другой раз', 'Ваш запрос очень важен для нас, оставайтесь на линии']), 'language_id': 2})
+        context_source = args.get('context_source')
 
         run_q = db.session.query(Run)
-        if not is_admin:
+
+        if context_source and context_source > 0 and not is_admin:
+            run_q = run_q.filter(or_(Run.context_source == context_source, Run.user_id == user_id))
+        elif not is_admin:
             run_q = run_q.filter(Run.user_id == user_id)
 
         run = run_q.filter(Run.id == run_id).one_or_none()
@@ -136,15 +139,20 @@ class ProtocolApi(MethodView):
     get_args = {
         'is_admin': fields.Boolean(default=False, missing=False),
         'user_id': fields.Integer(),
+        'context_source': fields.Integer(default=0),
     }
 
     def get(self, run_id: int):
         args = parser.parse(self.get_args, request)
         is_admin = args.get('is_admin')
         user_id = args.get('user_id')
+        context_source = args.get('context_source')
 
         run_q = db.session.query(Run)
-        if not is_admin:
+
+        if context_source and context_source > 0 and not is_admin:
+            run_q = run_q.filter(or_(Run.context_source == context_source, Run.user_id == user_id))
+        elif not is_admin:
             run_q = run_q.filter(Run.user_id == user_id)
 
         run = run_q.filter(Run.id == run_id).one_or_none()
