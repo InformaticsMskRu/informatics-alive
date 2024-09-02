@@ -20,4 +20,4 @@ WORKDIR /code/rmatics
 
 RUN pip3 install --requirement requirements.txt
 
-CMD ["uwsgi", "--http", ":5000", "--processes", "1", "--threads", "2", "--wsgi-file", "rmatics/wsgi.py", "--callable", "application", "-b", "32768"]
+CMD ["uwsgi", "--http", ":5000", "--processes", "1", "--threads", "2", "--wsgi-file", "wsgi.py", "--callable", "application", "-b", "32768"]
