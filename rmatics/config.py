@@ -41,9 +41,6 @@ class BaseConfig:
     DEBUG = False
     TESTING = False
 
-    # secrets
-    SECRET_KEY = os.getenv('SECRET_KEY', 'secret_key')
-
     # databases
     URL_ENCODER_ALPHABET = os.getenv('URL_ENCODER_ALPHABET', 'abcdefg')
 
@@ -64,11 +61,9 @@ class BaseConfig:
     # services
     EJUDGE_NEW_CLIENT_URL = os.getenv('EJUDGE_NEW_CLIENT_URL', 'http://localhost/cgi-bin/new-client')
     EJUDGE_MASTER_TOKEN = os.getenv('EJUDGE_MASTER_TOKEN', 'token')
-    EJUDGE_USER = os.getenv('EJUDGE_USER', 'user')
-    EJUDGE_PASSWORD = os.getenv('EJUDGE_PASSWORD', 'pass')
 
-    CENTRIFUGO_URL = os.getenv('CENTRIFUGO_URL', 'http://localhost:1377')
-    CENTRIFUGO_API_KEY = os.getenv('CENTRIFUGO_API_KEY', 'foo')
+    #CENTRIFUGO_URL = os.getenv('CENTRIFUGO_URL', 'http://localhost:1377')
+    #CENTRIFUGO_API_KEY = os.getenv('CENTRIFUGO_API_KEY', 'foo')
 
 
 class DevConfig(BaseConfig):

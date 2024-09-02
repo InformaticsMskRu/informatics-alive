@@ -27,7 +27,7 @@ def report_error(code, login_data, submit_data, file, filename, user_id, addon =
     log.close()
 
 
-def submit(run_file, contest_id, prob_id, lang_id, login, password, filename, url):
+def submit(run_file, contest_id, prob_id, lang_id, filename, url):
     files = {'file' : (filename, run_file)}
 
     submit_data = {

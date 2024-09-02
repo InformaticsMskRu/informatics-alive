@@ -85,8 +85,6 @@ class TestEjudge__submit_queue_submit_send(TestCase):
             contest_id=1,
             prob_id=1,
             lang_id=27,
-            login=current_app.config['EJUDGE_USER'],
-            password=current_app.config['EJUDGE_PASSWORD'],
             filename='common_filename',
             url='ejudge_url',
         )

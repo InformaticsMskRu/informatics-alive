@@ -37,8 +37,6 @@ class Submit:
         self.id = id
         self.run_id = run_id
         self.ejudge_url = ejudge_url
-        self.ejudge_user = current_app.config.get('EJUDGE_USER')
-        self.ejudge_password = current_app.config.get('EJUDGE_PASSWORD')
 
     @retry_on_exception(sa_exc.OperationalError, times=4)
     def _get_run(self) -> Optional[Run]:
@@ -104,8 +102,6 @@ class Submit:
                 contest_id=problem.ejudge_contest_id,
                 prob_id=problem.problem_id,
                 lang_id=ejudge_language_id,
-                login=self.ejudge_user,
-                password=self.ejudge_password,
                 filename='common_filename',
                 url=ejudge_url,
             )
