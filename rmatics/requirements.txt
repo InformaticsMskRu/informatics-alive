@@ -12,7 +12,6 @@ idna==2.7
 itsdangerous==0.24
 Jinja2==2.10
 jsonschema==2.6.0
-MarkupSafe==1.0
 pymongo==3.7.1
 python-engineio==2.2.0
 python-socketio==2.0.0
@@ -30,5 +29,6 @@ teamcity-messages
 mock
 pyhamcrest
 flask-testing
+python-dateutil
 uwsgi
 redlock-py==1.0.8

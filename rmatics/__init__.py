@@ -35,9 +35,9 @@ def create_app(config=None, config_logger=True):
     invalidator.init_app(remove_cache_func=redis.delete)
 
     # Centrifugo
-    cent_url = app.config.get('CENTRIFUGO_URL')
-    cent_api_key = app.config.get('CENTRIFUGO_API_KEY')
-    centrifugo_client.init_app(cent_url, cent_api_key)
+    #сent_url = app.config.get('CENTRIFUGO_URL')
+    #cent_api_key = app.config.get('CENTRIFUGO_API_KEY')
+    #centrifugo_client.init_app(cent_url, cent_api_key)
 
     app.register_error_handler(HTTPException, handle_api_exception)
 
