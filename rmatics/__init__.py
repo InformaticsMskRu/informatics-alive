@@ -8,7 +8,6 @@ from rmatics.model.base import db
 from rmatics.model.base import mongo
 from rmatics.model.base import redis
 from rmatics.plugins import monitor_cacher, invalidator
-from rmatics.utils.centrifugo import centrifugo_client
 from rmatics.view import handle_api_exception
 from rmatics.view.monitors.route import monitor_blueprint
 from rmatics.view.problem.route import problem_blueprint
