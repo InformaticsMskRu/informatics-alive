@@ -118,8 +118,8 @@ ConfigParser -- responsible for parsing a list of
         `space_around_delimiters' is True (the default), delimiters
         between keys and values are surrounded by spaces.
 """
-
-from collections import UserDict, MutableMapping as DictMixin, UserList, MutableMapping, OrderedDict as _default_dict
+from collections.abc import MutableMapping as DictMixin, MutableMapping
+from collections import UserList, OrderedDict as _default_dict
 import functools
 import io
 import itertools
