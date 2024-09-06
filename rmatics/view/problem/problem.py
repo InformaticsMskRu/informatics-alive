@@ -6,6 +6,7 @@ from flask import (
     request,
 )
 from flask import jsonify as flask_jsonify
+from flask import current_app as app
 from flask.views import MethodView
 from marshmallow import fields
 from sqlalchemy import desc, true
@@ -144,6 +145,7 @@ class TrustedSubmitApi(MethodView):
 
 class ProblemApi(MethodView):
     def get(self, problem_id: int):
+        app.logger.info(f'Get problem_id {problem_id}', problem_id=problem_id)
         problem = db.session.query(EjudgeProblem).get(problem_id)
         if not problem:
             raise NotFound('Problem with this id is not found')
