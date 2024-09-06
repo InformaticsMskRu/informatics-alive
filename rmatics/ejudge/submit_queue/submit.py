@@ -5,7 +5,7 @@ from flask import current_app
 from sqlalchemy import exc as sa_exc
 from sqlalchemy.orm import joinedload
 
-from rmatics import centrifugo_client
+#from rmatics import centrifugo_client
 from rmatics.ejudge.ejudge_proxy import submit
 from rmatics.model.base import db
 from rmatics.model.run import Run
@@ -94,7 +94,7 @@ class Submit:
 
         file = run.source
 
-        centrifugo_client.send_problem_run_updates(run.problem_id, run)
+        #centrifugo_client.send_problem_run_updates(run.problem_id, run)
 
         try:
             ejudge_response = submit(

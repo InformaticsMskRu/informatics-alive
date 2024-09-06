@@ -38,8 +38,8 @@ def bool_(v: str = None) -> bool:
 
 class BaseConfig:
     # global
-    DEBUG = False
-    TESTING = False
+    DEBUG = os.getenv('DEBUG', False)
+    TESTING = os.getenv('TESTING', False)
 
     # databases
     URL_ENCODER_ALPHABET = os.getenv('URL_ENCODER_ALPHABET', 'abcdefg')
