@@ -11,6 +11,7 @@ from flask.views import MethodView
 from marshmallow import fields
 from sqlalchemy import desc, true
 from sqlalchemy.orm import Load
+from webargs.core import ValidationError
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
@@ -176,6 +177,11 @@ get_args = {
     'include_source': fields.Boolean(required=False, missing=False, default=False),
 }
 
+# Error handler for webargs
+@parser.error_handler
+def handle_parsing_error(err, req, schema, *, error_status_code, error_headers):
+    app.logger.error(f"Error parsing arguments: {err.messages}")
+    raise ValidationError(err.messages)
 
 # TODO: only teacher
 class ProblemSubmissionsFilterApi(MethodView):
@@ -210,7 +216,7 @@ class ProblemSubmissionsFilterApi(MethodView):
         return self.process(problem_id, user_ids)
 
     def process(self, problem_id: int, user_ids):
-        args = parser.parse(get_args, request)
+        args = parser.parse(get_args, request, location="querystring")
         query = self._build_query_by_args(args, problem_id, user_ids)
         per_page_count = args.get('count')
         page = args.get('page')
@@ -226,13 +232,13 @@ class ProblemSubmissionsFilterApi(MethodView):
             problem_ids.add(run.problem_id)
             user_ids.add(run.user_id)
 
-        problems_result = db.session.query(Problem).filter(Problem.id.in_(problem_ids)).options(Load(Problem).load_only('id', 'name'))
+        problems_result = db.session.query(Problem).filter(Problem.id.in_(problem_ids)).options(Load(Problem).load_only(Problem.id, Problem.name))
         problems = dict()
 
         for problem in problems_result:
             problems[problem.id] = problem
 
-        users_result = db.session.query(SimpleUser).filter(SimpleUser.id.in_(user_ids)).options(Load(SimpleUser).load_only('id', 'firstname', 'lastname'))
+        users_result = db.session.query(SimpleUser).filter(SimpleUser.id.in_(user_ids)).options(Load(SimpleUser).load_only(SimpleUser.id, SimpleUser.firstname, SimpleUser.lastname))
         users = dict()
 
         for u in users_result:
