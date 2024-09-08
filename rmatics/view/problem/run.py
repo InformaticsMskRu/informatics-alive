@@ -159,7 +159,7 @@ class ProtocolApi(MethodView):
         stmt = stmt.where(Run.id == run_id)
 
         compiled_query = stmt.compile(compile_kwargs={"literal_binds": True})
-        сurrent_app.logger.debug(f'args: {args}')
+        current_app.logger.debug(f'args: {args}')
         current_app.logger.debug(f'Compiled query: {compiled_query}')
 
         run = db.session.execute(stmt).scalars().one_or_none()
