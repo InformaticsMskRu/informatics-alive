@@ -1,8 +1,9 @@
 import os
 import glob
 from zipfile import ZipFile
+from typing import List
 
-from sqlalchemy.orm import Mapped, List
+from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import relationship
 
 from rmatics.ejudge.serve_internal import EjudgeContestCfg
