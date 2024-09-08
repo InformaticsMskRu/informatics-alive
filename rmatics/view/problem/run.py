@@ -6,6 +6,7 @@ from pymongo.errors import PyMongoError, DuplicateKeyError
 from webargs.flaskparser import parser
 from werkzeug.exceptions import NotFound, BadRequest, InternalServerError
 from sqlalchemy import or_
+from sqlalchemy.future import select
 
 from rmatics.ejudge.submit_queue import queue_submit
 from rmatics.model.base import db, mongo
@@ -148,14 +149,19 @@ class ProtocolApi(MethodView):
         user_id = args.get('user_id')
         context_source = args.get('context_source')
 
-        run_q = db.session.query(Run)
+        stmt = select(Run)
 
         if context_source and context_source > 0 and not is_admin:
-            run_q = run_q.filter(or_(Run.context_source == context_source, Run.user_id == user_id))
+            stmt = stmt.where(or_(Run.context_source == context_source, Run.user_id == user_id))
         elif not is_admin:
-            run_q = run_q.filter(Run.user_id == user_id)
+            stmt = stmt.where(Run.user_id == user_id)
 
-        run = run_q.filter(Run.id == run_id).one_or_none()
+        stmt = stmt.where(Run.id == run_id)
+
+        compiled_query = stmt.compile(compile_kwargs={"literal_binds": True})
+        app.logger.debug(f'Compiled query: {compiled_query}')
+
+        run = db.session.execute(stmt).scalars().one_or_none()
 
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')

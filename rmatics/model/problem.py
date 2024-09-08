@@ -3,8 +3,7 @@ import glob
 from zipfile import ZipFile
 from typing import List
 
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from rmatics.ejudge.serve_internal import EjudgeContestCfg
 from rmatics.model.base import db

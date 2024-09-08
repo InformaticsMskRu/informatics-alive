@@ -263,7 +263,7 @@ class ProblemSubmissionsFilterApi(MethodView):
 
         return flask_jsonify({
             'result': 'success',
-            'data': data.data,
+            'data': data,
             'metadata': metadata
         })
 
