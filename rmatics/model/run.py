@@ -36,8 +36,8 @@ class Run(db.Model):
     statement_id = db.Column(db.Integer)
     score = db.Column(db.Integer)
 
-    user = db.relationship('SimpleUser', lazy='select')
-    problem: Mapped[EjudgeProblem] = relationship(lazy='select')
+    user: Mapped['SimpleUser'] = relationship(lazy='select')
+    problem: Mapped['EjudgeProblem'] = relationship(lazy='select')
     # statement = db.relationship('Statement', backref='runs')
 
     create_time = db.Column(db.DateTime(), default=datetime.datetime.utcnow)

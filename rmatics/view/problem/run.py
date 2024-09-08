@@ -105,7 +105,7 @@ class SourceApi(MethodView):
     }
 
     def get(self, run_id: int):
-        args = parser.parse(self.get_args, request)
+        args = parser.parse(self.get_args, request, location="querystring")
         is_admin = args.get('is_admin')
         user_id = args.get('user_id')
         context_source = args.get('context_source')
@@ -144,7 +144,7 @@ class ProtocolApi(MethodView):
     }
 
     def get(self, run_id: int):
-        args = parser.parse(self.get_args, request)
+        args = parser.parse(self.get_args, request, location="querystring")
         is_admin = args.get('is_admin')
         user_id = args.get('user_id')
         context_source = args.get('context_source')
@@ -159,7 +159,8 @@ class ProtocolApi(MethodView):
         stmt = stmt.where(Run.id == run_id)
 
         compiled_query = stmt.compile(compile_kwargs={"literal_binds": True})
-        app.logger.debug(f'Compiled query: {compiled_query}')
+        сurrent_app.logger.debug(f'args: {args}')
+        current_app.logger.debug(f'Compiled query: {compiled_query}')
 
         run = db.session.execute(stmt).scalars().one_or_none()
 

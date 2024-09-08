@@ -94,7 +94,7 @@ contest_based_get_args = {
 
 class ContestBasedMonitorAPIView(MethodView):
     def get(self):
-        args = parser.parse(contest_based_get_args, request)
+        args = parser.parse(contest_based_get_args, request, location="querystring")
         group_id = args['group_id']
 
         if group_id:
@@ -207,7 +207,7 @@ class ProblemBasedMonitorAPIView(MethodView):
     """
 
     def get(self):
-        args = parser.parse(problem_based_get_args, request)
+        args = parser.parse(problem_based_get_args, request, location="querystring")
 
         user_ids = args['user_id']
         if not user_ids:
