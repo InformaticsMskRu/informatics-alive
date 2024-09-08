@@ -83,7 +83,7 @@ class EjudgeProblem(Problem):
     problem_id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=False) #id in contest
     short_id = db.Column(db.Unicode(50))
     ejudge_name = db.Column('name', db.Unicode(255))
-    runs: Mapped[List[Run]] = relationship('Run', back_populates='problem', lazy='dynamic')
+    runs: Mapped[List['Run']] = relationship('Run', back_populates='problem', lazy='dynamic')
 
     @staticmethod
     def create(**kwargs):
