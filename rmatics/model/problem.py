@@ -2,6 +2,7 @@ import os
 import glob
 from zipfile import ZipFile
 
+from sqlalchemy.orm import Mapped, List
 from sqlalchemy.orm import relationship
 
 from rmatics.ejudge.serve_internal import EjudgeContestCfg
@@ -9,7 +10,6 @@ from rmatics.model.base import db
 from rmatics.utils.decorators import deprecated
 from rmatics.utils.json_type import JsonType
 from rmatics.utils.run import read_file_unknown_encoding
-
 
 class Problem(db.Model):
     __table_args__ = {'schema':'moodle'}
@@ -82,6 +82,7 @@ class EjudgeProblem(Problem):
     problem_id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=False) #id in contest
     short_id = db.Column(db.Unicode(50))
     ejudge_name = db.Column('name', db.Unicode(255))
+    runs: Mapped[List[Run]] = relationship('Run', back_populates='problem', lazy='dynamic')
 
     @staticmethod
     def create(**kwargs):

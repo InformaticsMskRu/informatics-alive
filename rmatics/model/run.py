@@ -6,7 +6,7 @@ from typing import Optional
 from flask import g
 from rmatics.utils.run import get_string_code, get_full_string_code
 from sqlalchemy import MetaData, Table
-
+from sqlalchemy.orm import Mapped
 from rmatics.model.base import db, mongo
 from rmatics.utils.decorators import deprecated
 from rmatics.utils.functions import attrs_to_dict
@@ -37,7 +37,7 @@ class Run(db.Model):
     score = db.Column(db.Integer)
 
     user = db.relationship('SimpleUser', backref='runs', lazy='select')
-    problem = db.relationship('EjudgeProblem', backref=db.backref('runs', lazy='dynamic'))
+    problem: Mapped[EjudgeProblem] = relationship(back_populates="runs", lazy='dynamic')
     # statement = db.relationship('Statement', backref='runs')
 
     create_time = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
