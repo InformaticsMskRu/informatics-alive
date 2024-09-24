@@ -1,4 +1,4 @@
-FROM ubuntu:focal
+FROM ubuntu:noble
 
 ENV FLASK_ENV=production
 ENV FLASK_APP=wsgi:application
@@ -18,6 +18,8 @@ RUN apt update && \
 COPY . /code/rmatics
 WORKDIR /code/rmatics
 
-RUN pip3 install --requirement requirements.txt
+RUN pip3 install --requirement requirements.txt --break-system-packages
+RUN useradd -ms /bin/bash uwsgi
 
-CMD ["uwsgi", "--http", ":5000", "--processes", "1", "--threads", "2", "--wsgi-file", "wsgi.py", "--callable", "application", "-b", "32768"]
+CMD ["uwsgi", "--http", ":5000", "--processes", "1", "--threads", "2", "--wsgi-file", "wsgi.py", "--callable", "application", "-b", "32768", "--uid", "uw
+sgi"]
