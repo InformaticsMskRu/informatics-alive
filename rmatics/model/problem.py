@@ -82,6 +82,7 @@ class EjudgeProblem(Problem):
     problem_id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=False) #id in contest
     short_id = db.Column(db.Unicode(50))
     ejudge_name = db.Column('name', db.Unicode(255))
+    judges_settings = db.Column(JsonType, nullable=True)
 
     @staticmethod
     def create(**kwargs):

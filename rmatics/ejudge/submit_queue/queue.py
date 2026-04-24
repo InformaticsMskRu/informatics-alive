@@ -40,7 +40,7 @@ class SubmitQueue(RedisQueue):
             submit = Submit(
                 id=pipe.incr(last_put_id_key(self.key)),
                 run_id=run_id,
-                ejudge_url=ejudge_url
+                ejudge_url=ejudge_url,
             )
             current_app.logger.info('before put _submit {} {}'.format(submit, submit.encode()))
             self.put(submit.encode(), pipe=pipe)

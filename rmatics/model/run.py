@@ -49,12 +49,13 @@ class Run(db.Model):
 
     ejudge_score = db.Column('ej_score', db.Integer)
     ejudge_status = db.Column('ej_status', db.Integer)
-    ejudge_language_id = db.Column('ej_lang_id', db.Integer)
+    lang_id = db.Column('ej_lang_id', db.Integer)
     ejudge_test_num = db.Column('ej_test_num', db.Integer)
 
     ejudge_create_time = db.Column('ej_create_time', db.DateTime)
     ejudge_last_change_time = db.Column('ej_last_change_time', db.DateTime)
     ejudge_url = db.Column(db.String(50))
+    judge_id = db.Column(db.String(50), nullable=True)
 
     source_hash = db.Column(db.String(32))  # We are using md5 hex digest
 
@@ -112,7 +113,7 @@ class Run(db.Model):
 
     @property
     def language_id(self):
-        return self.ejudge_language_id
+        return self.lang_id
 
     @staticmethod
     @deprecated
@@ -123,7 +124,7 @@ class Run(db.Model):
             'ejudge_run_uuid': ejudge_run.run_uuid,
             'ejudge_score': ejudge_run.score,
             'ejudge_status': ejudge_run.status,
-            'ejudge_language_id': ejudge_run.lang_id,
+            'lang_id': ejudge_run.lang_id,
             'ejudge_test_num': ejudge_run.test_num,
             'ejudge_create_time': ejudge_run.create_time,
             'ejudge_last_change_time': ejudge_run.last_change_time,

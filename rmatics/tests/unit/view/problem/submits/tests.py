@@ -83,7 +83,7 @@ class TestTrustedProblemSubmit(TestCase):
             problem_id=self.ejudge_problems[0].id,
             statement_id=self.statements[0].id,
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=1,
+            lang_id=1,
             ejudge_status=EjudgeStatuses.COMPILING.value,
             source_hash=source_hash,
         )
@@ -117,7 +117,7 @@ class TestGetSubmissionSource(TestCase):
             problem_id=self.ejudge_problems[0].id,
             statement_id=self.statements[0].id,
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=1,
+            lang_id=1,
             ejudge_status=EjudgeStatuses.COMPILING.value,
             source_hash=source_hash,
         )
@@ -172,7 +172,7 @@ class TestUpdateSubmissionFromEjudge(TestCase):
             problem_id=self.ejudge_problems[0].id,
             statement_id=None,
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=1,
+            lang_id=1,
             ejudge_status=EjudgeStatuses.COMPILING.value,
             source_hash=source_hash,
             ejudge_run_id=1
@@ -289,7 +289,7 @@ class TestGetRunProtocol(TestCase):
             problem_id=self.ejudge_problems[0].id,
             statement_id=None,
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=1,
+            lang_id=1,
             ejudge_status=EjudgeStatuses.OK.value,
             source_hash=source_hash,
             ejudge_run_id=1
@@ -300,7 +300,7 @@ class TestGetRunProtocol(TestCase):
             problem_id=self.ejudge_problems[1].id,
             statement_id=None,
             ejudge_contest_id=self.ejudge_problems[1].ejudge_contest_id,
-            ejudge_language_id=1,
+            lang_id=1,
             ejudge_status=EjudgeStatuses.OK.value,
             source_hash=source_hash,
             ejudge_run_id=2

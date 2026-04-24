@@ -29,15 +29,15 @@ class TestAPIProblemSubmission(TestCase):
         db.session.flush()
 
         self.run1 = Run(user_id=self.user1.id, problem_id=self.problems[1].id,
-                        ejudge_status=0, ejudge_language_id=1, is_visible=True)
+                        ejudge_status=0, lang_id=1, is_visible=True)
         self.run2 = Run(user_id=self.user1.id, problem_id=self.problems[2].id,
-                        ejudge_status=0, ejudge_language_id=1, is_visible=True)
+                        ejudge_status=0, lang_id=1, is_visible=True)
         self.run3 = Run(user_id=self.user2.id, problem_id=self.problems[1].id,
-                        ejudge_status=2, ejudge_language_id=2, is_visible=True)
+                        ejudge_status=2, lang_id=2, is_visible=True)
         self.run4 = Run(user_id=self.user2.id, problem_id=self.problems[2].id,
-                        ejudge_status=2, ejudge_language_id=2, is_visible=True)
+                        ejudge_status=2, lang_id=2, is_visible=True)
         self.run5 = Run(user_id=self.user2.id, problem_id=self.problems[1].id,
-                        ejudge_status=2, ejudge_language_id=2, is_visible=False)
+                        ejudge_status=2, lang_id=2, is_visible=False)
 
         self.run4.create_time = datetime.utcnow() - timedelta(days=1)
 
@@ -134,7 +134,7 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(len(data['data']), 1)
 
     def test_filter_by_lang(self):
-        resp = self.send_request(self.problems[1].id, lang_id=self.run1.ejudge_language_id)
+        resp = self.send_request(self.problems[1].id, lang_id=self.run1.lang_id)
 
         self.assert200(resp)
 

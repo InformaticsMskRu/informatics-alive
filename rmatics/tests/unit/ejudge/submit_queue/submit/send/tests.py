@@ -53,7 +53,7 @@ class TestEjudge__submit_queue_submit_send(TestCase):
             statement_id=self.statements[0].id,
             create_time=datetime.datetime(2018, 3, 30, 16, 59, 0),
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=27,
+            lang_id=27,
             ejudge_status=EjudgeStatuses.COMPILING.value,
         )
         db.session.add(run)
@@ -85,10 +85,10 @@ class TestEjudge__submit_queue_submit_send(TestCase):
             contest_id=1,
             prob_id=1,
             lang_id=27,
-            login=current_app.config['EJUDGE_USER'],
-            password=current_app.config['EJUDGE_PASSWORD'],
             filename='common_filename',
             url='ejudge_url',
+            sender_user_id=5,
+            token=None,
         )
 
         run = db.session.query(Run).one()
@@ -96,6 +96,7 @@ class TestEjudge__submit_queue_submit_send(TestCase):
         assert_that(run.ejudge_contest_id, equal_to(self.ejudge_problems[0].ejudge_contest_id))
         assert_that(run.user.id, equal_to(self.users[0].id))
         assert_that(run.problem.id, equal_to(self.ejudge_problems[0].id))
+        assert_that(run.judge_id, equal_to(None))  # DEFAULT_JUDGE_ID not configured in tests
 
     def test_handles_submit_exception(self):
         # В случае, если функция submit бросила исключение
@@ -105,7 +106,7 @@ class TestEjudge__submit_queue_submit_send(TestCase):
             statement_id=self.statements[0].id,
             create_time=datetime.datetime(2018, 3, 30, 16, 59, 0),
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=27,
+            lang_id=27,
             ejudge_status=EjudgeStatuses.COMPILING.value,
         )
         db.session.add(run)
@@ -141,7 +142,7 @@ class TestEjudge__submit_queue_submit_send(TestCase):
             statement_id=self.statements[0].id,
             create_time=datetime.datetime(2018, 3, 30, 17, 10, 11),
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
-            ejudge_language_id=27,
+            lang_id=27,
             ejudge_status=EjudgeStatuses.COMPILING.value,
         )
         db.session.add(run)
