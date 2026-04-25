@@ -4,6 +4,7 @@ from flask import Flask
 from werkzeug.exceptions import HTTPException
 
 from rmatics import cli
+from rmatics.ejudge.judges_config import init_app as init_judges
 from rmatics.model.base import db
 from rmatics.model.base import mongo
 from rmatics.model.base import redis
@@ -28,6 +29,7 @@ def create_app(config=None, config_logger=True):
     db.init_app(app)
     mongo.init_app(app)
     redis.init_app(app)
+    init_judges(app)
 
     monitor_caching_time = app.config.get('MONITOR_CACHING_TIME_HOURS', 1) * 60 * 60
     monitor_cacher.init_app(app, redis, period=monitor_caching_time, autocommit=False)

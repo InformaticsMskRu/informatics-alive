@@ -64,8 +64,8 @@ class BaseConfig:
     # services
     EJUDGE_NEW_CLIENT_URL = os.getenv('EJUDGE_NEW_CLIENT_URL', 'http://localhost/cgi-bin/new-client')
     EJUDGE_MASTER_TOKEN = os.getenv('EJUDGE_MASTER_TOKEN', 'token')
-    EJUDGE_USER = os.getenv('EJUDGE_USER', 'user')
-    EJUDGE_PASSWORD = os.getenv('EJUDGE_PASSWORD', 'pass')
+    JUDGES_CONFIG_PATH = os.getenv('JUDGES_CONFIG_PATH', None)
+    DEFAULT_JUDGE_ID = os.getenv('DEFAULT_JUDGE_ID', None)
 
     CENTRIFUGO_URL = os.getenv('CENTRIFUGO_URL', 'http://localhost:1377')
     CENTRIFUGO_API_KEY = os.getenv('CENTRIFUGO_API_KEY', 'foo')

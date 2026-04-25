@@ -103,7 +103,7 @@ class TrustedSubmitApi(MethodView):
 
         if duplicate is not None and \
                 duplicate.source_hash == source_hash and \
-                duplicate.ejudge_language_id == language_id:
+                duplicate.lang_id == language_id:
             raise BadRequest('Source file is duplicate of your previous submission')
 
         # There is not constraint on statement_id
@@ -112,7 +112,7 @@ class TrustedSubmitApi(MethodView):
             problem_id=problem_id,
             statement_id=statement_id,
             ejudge_contest_id=problem.ejudge_contest_id,
-            ejudge_language_id=language_id,
+            lang_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
 
@@ -301,7 +301,7 @@ class ProblemSubmissionsFilterApi(MethodView):
             query = query.filter(Run.user_id.in_(user_ids))
 
         if lang_id and lang_id > 0:
-            query = query.filter(Run.ejudge_language_id == lang_id)
+            query = query.filter(Run.lang_id == lang_id)
         if status_id != -1:
             query = query.filter(Run.ejudge_status == status_id)
         if from_timestamp:

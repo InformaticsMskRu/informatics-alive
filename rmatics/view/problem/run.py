@@ -7,6 +7,7 @@ from webargs.flaskparser import parser
 from werkzeug.exceptions import NotFound, BadRequest, InternalServerError
 from sqlalchemy import or_
 
+from rmatics.ejudge.judges_config import get_judge
 from rmatics.ejudge.submit_queue import queue_submit
 from rmatics.model.base import db, mongo
 from rmatics.model.rejudge import Rejudge
@@ -70,21 +71,25 @@ class RunAPI(MethodView):
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')
 
-        # If ejudge_url is None submission failed by error inside workers
-        # And we shouldn't really rejudge the solution
-        if run.ejudge_url is None:
-            run.ejudge_url = current_app.config['EJUDGE_NEW_CLIENT_URL']
-            db.session.add(run)
-        else:
+        # Resolve target ejudge URL: named judge > legacy ejudge_url column > system default
+        judge = get_judge(run.judge_id) if run.judge_id else None
+        ejudge_url = (judge.url if judge else None) \
+            or run.ejudge_url \
+            or current_app.config['EJUDGE_NEW_CLIENT_URL']
+
+        # A run was never processed when no judge was recorded (judge_id for new runs,
+        # ejudge_url for old runs). In that case skip creating a rejudge archive record.
+        never_processed = run.judge_id is None and run.ejudge_url is None
+        if not never_processed:
             rejudge = Rejudge(run_id=run.id,
                               ejudge_contest_id=run.ejudge_contest_id,
-                              ejudge_url=run.ejudge_url or 'rmatics_failed_submission')
+                              ejudge_url=ejudge_url)
             db.session.add(rejudge)
             db.session.flush([rejudge])
 
             run.move_protocol_to_rejudge_collection(rejudge.id)
 
-        queue_submit(run.id, run.ejudge_url)
+        queue_submit(run.id, ejudge_url)
 
         run.ejudge_status = 377
         run.ejudge_test_num = None
@@ -121,7 +126,7 @@ class SourceApi(MethodView):
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')
 
-        language_id = run.ejudge_language_id
+        language_id = run.lang_id
 
         source = run.source or b''
         for encoding in POSSIBLE_SOURCE_ENCODINGS:
