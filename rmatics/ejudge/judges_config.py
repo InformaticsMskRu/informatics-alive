@@ -8,6 +8,7 @@ from flask import Flask, current_app
 @dataclass
 class JudgeConfig:
     url: str
+    name: str = field(default='')
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
     lang_map: Dict[int, int] = field(default_factory=dict)
@@ -19,12 +20,13 @@ class JudgeConfig:
         return self.lang_map.get(lang_id, lang_id)
 
 
-def _load(path: str) -> Dict[str, JudgeConfig]:
+def _load(path: str) -> Dict[int, JudgeConfig]:
     with open(path) as f:
         data = json.load(f)
     return {
-        jid: JudgeConfig(
+        int(jid): JudgeConfig(
             url=cfg['url'],
+            name=cfg.get('name', ''),
             token=cfg.get('token'),
             sender_user_id=cfg.get('sender_user_id', 5),
             lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()},
@@ -51,11 +53,22 @@ def init_app(app: Flask) -> None:
             'DEFAULT_JUDGE_ID not set: runs using the default judge path will not '
             'record judge_id, preventing protocol archiving on rejudge'
         )
-    elif default_id not in app.extensions['judges']:
-        app.logger.warning(
-            f'DEFAULT_JUDGE_ID {default_id!r} not found in loaded judges config'
-        )
+    else:
+        try:
+            default_id_int = int(default_id)
+        except (TypeError, ValueError):
+            app.logger.warning(f'DEFAULT_JUDGE_ID {default_id!r} is not a valid integer')
+            default_id_int = None
+        if default_id_int is not None and default_id_int not in app.extensions['judges']:
+            app.logger.warning(
+                f'DEFAULT_JUDGE_ID {default_id!r} not found in loaded judges config'
+            )
 
 
-def get_judge(judge_id: str) -> Optional[JudgeConfig]:
+def get_default_judge_id() -> Optional[int]:
+    raw = current_app.config.get('DEFAULT_JUDGE_ID')
+    return int(raw) if raw is not None else None
+
+
+def get_judge(judge_id: int) -> Optional[JudgeConfig]:
     return current_app.extensions.get('judges', {}).get(judge_id)

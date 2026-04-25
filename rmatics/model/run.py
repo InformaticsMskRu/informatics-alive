@@ -55,7 +55,7 @@ class Run(db.Model):
     ejudge_create_time = db.Column('ej_create_time', db.DateTime)
     ejudge_last_change_time = db.Column('ej_last_change_time', db.DateTime)
     ejudge_url = db.Column(db.String(50))
-    judge_id = db.Column(db.String(50), nullable=True)
+    judge_id = db.Column(db.SmallInteger, nullable=True)
 
     source_hash = db.Column(db.String(32))  # We are using md5 hex digest
 
