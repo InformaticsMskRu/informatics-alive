@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from rmatics import centrifugo_client
 from rmatics.ejudge.ejudge_proxy import submit
-from rmatics.ejudge.judges_config import get_judge
+from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
 from rmatics.model.base import db
 from rmatics.model.run import Run
 from rmatics.utils.functions import attrs_to_dict
@@ -32,6 +32,15 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
     An entry is a candidate when BOTH filters match:
       - lang_ids is null  OR  lang_id  in lang_ids
       - user_ids is null  OR  user_id  in user_ids
+
+    judges_settings entry shape:
+      {
+        "judge_id":  <int>,    # optional — references a judge in judges.json by numeric id
+        "contest_id": <int>,   # required
+        "problem_id": <int>,   # required
+        "lang_ids":  [<int>],  # null / absent matches any language
+        "user_ids":  [<int>]   # null / absent matches any moodle user
+      }
 
     Entries missing contest_id or problem_id are skipped with a warning.
     Among valid candidates, higher specificity (more filters set) wins;
@@ -151,7 +160,7 @@ class Submit:
             contest_id = entry['contest_id']
             prob_id = entry['problem_id']
         else:
-            judge_id = current_app.config.get('DEFAULT_JUDGE_ID')
+            judge_id = get_default_judge_id()
             contest_id = problem.ejudge_contest_id
             prob_id = problem.problem_id
 
