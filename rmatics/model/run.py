@@ -54,6 +54,7 @@ class Run(db.Model):
 
     ejudge_create_time = db.Column('ej_create_time', db.DateTime)
     ejudge_last_change_time = db.Column('ej_last_change_time', db.DateTime)
+    ejudge_last_timestamp = db.Column('ej_last_timestamp', db.BigInteger)
     ejudge_url = db.Column(db.String(50))
     judge_id = db.Column(db.SmallInteger, nullable=True)
 

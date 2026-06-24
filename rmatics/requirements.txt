@@ -16,7 +16,7 @@ MarkupSafe==1.0
 pymongo==3.7.1
 python-engineio==2.2.0
 python-socketio==2.0.0
-redis==2.10.6
+redis==4.2.0
 requests==2.19.1
 short-url==1.2.2
 six==1.11.0

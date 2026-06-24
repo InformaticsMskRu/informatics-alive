@@ -3,6 +3,7 @@ import datetime
 from rmatics.model.base import db
 from rmatics.model.user import SimpleUser
 
+from sqlalchemy.dialects.mysql import INTEGER
 
 class Comment(db.Model):
     __table_args__ = (
@@ -16,8 +17,8 @@ class Comment(db.Model):
    
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime)
-    run_id = db.Column(db.Integer)
-    contest_id = db.Column(db.Integer)
+    run_id = db.Column(INTEGER(unsigned=True))
+    contest_id = db.Column(INTEGER(unsigned=True))
     user_id = db.Column(db.Integer)
     author_user_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_user.id'))
     lines = db.Column(db.Text)

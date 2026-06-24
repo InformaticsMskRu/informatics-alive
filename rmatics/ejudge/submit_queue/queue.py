@@ -1,4 +1,4 @@
-import pickle
+import pickle                                                                                                                                                                                                       
 
 from .submit import Submit
 from rmatics.model.base import redis
@@ -21,7 +21,7 @@ def user_submits_key(key, user_id):
 
 
 class SubmitQueue(RedisQueue):
-    """
+    """ 
     Очередь сабмитов.
     Кроме самих сабмитов поддерживает id последнего добавленного в очередь и
     id последнего полученного из очереди.
@@ -35,39 +35,19 @@ class SubmitQueue(RedisQueue):
 
     def submit(self, run_id, ejudge_url):
         current_app.logger.info('Submit {} {}'.format(run_id, ejudge_url))
-        def _submit(pipe):
-            current_app.logger.info('_submit {} {} {} {}'.format(run_id, ejudge_url, self.key, last_put_id_key(self.key)))
-            submit = Submit(
-                id=pipe.incr(last_put_id_key(self.key)),
-                run_id=run_id,
-                ejudge_url=ejudge_url,
-            )
-            current_app.logger.info('before put _submit {} {}'.format(submit, submit.encode()))
-            self.put(submit.encode(), pipe=pipe)
-            return submit
-        submit = redis.transaction(
-            _submit,
-            self.key,
-            last_get_id_key(self.key),
-            last_put_id_key(self.key),
-            value_from_callable=True
-        )
+        # INCR и RPUSH атомарны сами по себе — WATCH/transaction здесь не нужен
+        # (и ломался на redis-py >= 3.0: запись watched-ключей в immediate-режиме
+        # давала вечный WatchError). Уникальность id обеспечивает INCR.
+        submit = Submit(
+            id=redis.incr(last_put_id_key(self.key)),
+            run_id=run_id,
+            ejudge_url=ejudge_url,
+        )   
+        self.put(submit.encode())
         return submit
 
     def get(self):
-        def _get(pipe):
-            submit_encoded = super(SubmitQueue, self).get_blocking(pipe=pipe)
-            current_app.logger.info('Here')
-            submit = Submit.decode(submit_encoded)
-            pipe.set(last_get_id_key(self.key), submit.id)
-            return submit
-
-        submit = redis.transaction(
-            _get,
-            self.key,
-            last_get_id_key(self.key),
-            last_put_id_key(self.key),
-            value_from_callable=True,
-        )
-
+        # BLPOP атомарен; last_get_id — лишь счётчик прогресса, CAS не нужен.
+        submit = Submit.decode(self.get_blocking())
+        redis.set(last_get_id_key(self.key), submit.id)
         return submit

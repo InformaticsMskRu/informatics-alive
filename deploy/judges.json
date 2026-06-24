@@ -1,0 +1,16 @@
+{
+  "1": {
+    "name": "local-ejudge",
+    "url": "http://172.17.0.1/cgi-bin/new-master",
+    "token": "AQAAXud0OmWugwNNeCwQN8LSP801SFHyu4a21GmqpmdV-Zw",
+    "sender_user_id": 1,
+    "lang_map": {}
+  },
+  "2": {
+    "name": "kodu-ejudge",
+    "url": "https://ej.kod-u.ru/cgi-bin/new-master",
+    "token": "AQAA8pt1UxGkPlr1uHDB9AK3BTcOlqQY4D8PsOvZ_XknPhU",
+    "sender_user_id": 1,
+    "lang_map": {}
+  }
+}
