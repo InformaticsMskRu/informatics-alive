@@ -32,9 +32,6 @@ from rmatics.view.problem.serializers.run import RunSchema
 DEFAULT_MOODLE_CONTEXT_SOURCE = 10
 
 
-_REQUIRED_ENTRY_KEYS = ('contest_id', 'problem_id')
-
-
 def _get_judge_entry(problem, lang_id: int, user_id: int):
     """Return the highest-priority matching judges_settings entry for (lang_id, user_id).
 
@@ -70,13 +67,6 @@ def _get_judge_entry(problem, lang_id: int, user_id: int):
 
     candidates = []
     for entry in settings:
-        missing = [k for k in _REQUIRED_ENTRY_KEYS if k not in entry]
-        if missing:
-            current_app.logger.warning(
-                f'Problem #{problem.id}: judges_settings entry missing required keys '
-                f'{missing!r}, skipping: {entry!r}'
-            )
-            continue
         lang_ids = entry.get('lang_ids')
         user_ids = entry.get('user_ids')
         if (lang_ids is None or lang_id in lang_ids) and \
@@ -184,7 +174,7 @@ class TrustedSubmitApi(MethodView):
             problem_id=problem_id,
             statement_id=statement_id,
             ejudge_contest_id=problem.ejudge_contest_id,
-            ejudge_last_timestamp=int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1_000_000),
+            ejudge_last_timestamp=0,
             lang_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,

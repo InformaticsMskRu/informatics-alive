@@ -31,18 +31,6 @@ def _to_int(value, default=None):
     except (TypeError, ValueError):
         return default
 
-
-def _find_run(ej_run_id, ej_contest_id, judge_id) -> Optional[Run]:
-    q = db.session.query(Run).filter_by(
-        ejudge_run_id=ej_run_id,
-        ejudge_contest_id=ej_contest_id,
-    )
-
-    if judge_id is not None:
-        q = q.filter(Run.judge_id == judge_id)
-
-    return q.order_by(Run.id.desc()).first()
-
 def _text(elem) -> str:
     return (elem.text or '') if elem is not None else ''
 
@@ -233,7 +221,7 @@ def handle_run_message(timestamp, run_data: dict):
     if run is None:
         current_app.logger.warning(
             f'notify: Run not found (ej_run={ej_run_id} ej_contest={ej_contest_id} '
-            f'judge_id={judge_id})'
+            f'rmatics_run_id={rmatics_run_id})'
         )
         return
     
