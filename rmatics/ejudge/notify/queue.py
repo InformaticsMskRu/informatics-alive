@@ -12,7 +12,7 @@ import requests
 from sqlalchemy import and_, update
 
 from rmatics import centrifugo_client
-from rmatics.ejudge.judges_config import get_judge
+from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
 from rmatics.model.base import db
 from rmatics.model.run import Run
 from rmatics.utils.cacher.helpers import invalidate_monitor_cache_by_run
@@ -250,7 +250,7 @@ def handle_run_message(timestamp, run_data: dict):
     invalidate_monitor_cache_by_run(run)
 
     if _is_terminal(status):
-        url, token = _resolve_judge(run_judge_id)
+        url, token = _resolve_judge(run_judge_id if run_judge_id is not None else get_default_judge_id())
         protocol = fetch_protocol(url, token, ej_contest_id, ej_run_id, run_id)
         if protocol is not None:
             run.protocol = protocol
