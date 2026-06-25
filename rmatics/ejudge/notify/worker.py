@@ -36,9 +36,8 @@ class NotifyWorker(Greenlet):
                     stream = current_app.config['EJUDGE_NOTIFY_STREAM']
                     group = current_app.config['EJUDGE_NOTIFY_GROUP']
                     consumer = f"{group}.{self.id}"
-                    judge_id = current_app.config['EJUDGE_NOTIFY_JUDGE_ID']
 
-                    self.queue = NotifyQueue(stream, group, consumer, judge_id)
+                    self.queue = NotifyQueue(stream, group, consumer)
 
                     current_app.logger.info('Worker started')
                     while True:

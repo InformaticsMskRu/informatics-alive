@@ -16,6 +16,8 @@ from werkzeug.exceptions import BadRequest, NotFound
 from rmatics.ejudge.submit_queue import (
     queue_submit,
 )
+from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
+
 from rmatics.model import CourseModule
 from rmatics.model.base import db
 from rmatics.model.group import UserGroup
@@ -28,6 +30,69 @@ from rmatics.view.problem.serializers.problem import ProblemSchema
 from rmatics.view.problem.serializers.run import RunSchema
 
 DEFAULT_MOODLE_CONTEXT_SOURCE = 10
+
+
+_REQUIRED_ENTRY_KEYS = ('contest_id', 'problem_id')
+
+
+def _get_judge_entry(problem, lang_id: int, user_id: int):
+    """Return the highest-priority matching judges_settings entry for (lang_id, user_id).
+
+    judges_settings is a list of entries:
+      {
+        "judge_id":  <str>,    # optional — references a judge in judges.json
+        "contest_id": <int>,   # required — contest_id inside that ejudge
+        "problem_id": <int>,   # required — prob_id inside the contest
+        "lang_ids":  [<int>],  # null / absent matches any language
+        "user_ids":  [<int>]   # null / absent matches any moodle user
+      }
+
+    An entry is a candidate when BOTH filters match:
+      - lang_ids is null  OR  lang_id  in lang_ids
+      - user_ids is null  OR  user_id  in user_ids
+
+    judges_settings entry shape:
+      {
+        "judge_id":  <int>,    # optional — references a judge in judges.json by numeric id
+        "contest_id": <int>,   # required
+        "problem_id": <int>,   # required
+        "lang_ids":  [<int>],  # null / absent matches any language
+        "user_ids":  [<int>]   # null / absent matches any moodle user
+      }
+
+    Entries missing contest_id or problem_id are skipped with a warning.
+    Among valid candidates, higher specificity (more filters set) wins;
+    listed order breaks ties. Returns None when no entry matches.
+    """
+    settings = problem.judges_settings
+    if not settings:
+        return None
+
+    candidates = []
+    for entry in settings:
+        missing = [k for k in _REQUIRED_ENTRY_KEYS if k not in entry]
+        if missing:
+            current_app.logger.warning(
+                f'Problem #{problem.id}: judges_settings entry missing required keys '
+                f'{missing!r}, skipping: {entry!r}'
+            )
+            continue
+        lang_ids = entry.get('lang_ids')
+        user_ids = entry.get('user_ids')
+        if (lang_ids is None or lang_id in lang_ids) and \
+           (user_ids is None or user_id in user_ids):
+            candidates.append(entry)
+
+    if not candidates:
+        return None
+
+    candidates.sort(
+        key=lambda e: -(
+            (e.get('lang_ids') is not None) +
+            (e.get('user_ids') is not None)
+        )
+    )
+    return candidates[0]
 
 
 class TrustedSubmitApi(MethodView):
@@ -106,6 +171,13 @@ class TrustedSubmitApi(MethodView):
                 duplicate.lang_id == language_id:
             raise BadRequest('Source file is duplicate of your previous submission')
 
+        entry = _get_judge_entry(problem, language_id, user_id)
+
+        if entry is not None:
+            judge_id = entry.get('judge_id')
+        else:
+            judge_id = get_default_judge_id()
+
         # There is not constraint on statement_id
         run = Run(
             user_id=user_id,
@@ -116,6 +188,7 @@ class TrustedSubmitApi(MethodView):
             lang_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
+            judge_id=judge_id,
 
             # Context related properties
             context_source=context_source,

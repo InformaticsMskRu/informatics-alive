@@ -193,7 +193,7 @@ def fetch_protocol(
         return None
 
 
-def handle_run_message(timestamp, run_data: dict, judge_id: Optional[int]):
+def handle_run_message(timestamp, run_data: dict):
     ej_run_id = _to_int(run_data.get('run_id'))
     ej_contest_id = _to_int(run_data.get('contest_id'))
 
@@ -249,7 +249,7 @@ def handle_run_message(timestamp, run_data: dict, judge_id: Optional[int]):
     invalidate_monitor_cache_by_run(run)
 
     if _is_terminal(status):
-        url, token = _resolve_judge(run_judge_id if run_judge_id is not None else judge_id)
+        url, token = _resolve_judge(run_judge_id)
         protocol = fetch_protocol(url, token, ej_contest_id, ej_run_id, run_id)
         if protocol is not None:
             run.protocol = protocol
@@ -258,7 +258,7 @@ def handle_run_message(timestamp, run_data: dict, judge_id: Optional[int]):
     current_app.logger.info(f'notify: Run #{run_id} -> status {status}')
 
 
-def process_message(raw: str, judge_id: Optional[int]):
+def process_message(raw: str):
     """Разобрать одно сообщение из stream и применить его."""
     try:
         message = json.loads(raw)
@@ -271,14 +271,13 @@ def process_message(raw: str, judge_id: Optional[int]):
     timestamp = _to_int(message.get('server_time_us'))
     
     if msg_type == 'run':
-        handle_run_message(timestamp, message.get('run') or {}, judge_id)
+        handle_run_message(timestamp, message.get('run') or {})
     else:
         current_app.logger.debug(f'notify: skip message type {msg_type!r}')
 
 class NotifyQueue(RedisStreamsQueue):
     
-    def __init__(self, stream, group, consumer, judge_id):
-        self.judge_id = judge_id
+    def __init__(self, stream, group, consumer):
         super(NotifyQueue, self).__init__(stream=stream, group=group, consumer=consumer)
 
     def get_and_process(self):
@@ -295,7 +294,7 @@ class NotifyQueue(RedisStreamsQueue):
 
                 try:
                     if data is not None:
-                        process_message(data, self.judge_id)
+                        process_message(data)
                 except Exception:
                     current_app.logger.exception(
                         'notify-worker: failed to process message'

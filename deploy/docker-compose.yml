@@ -17,7 +17,6 @@ x-rmatics-env: &rmatics-env
   # Notification
   EJUDGE_NOTIFY_STREAM: ejudge.notify
   EJUDGE_NOTIFY_GROUP: rmatics
-  EJUDGE_NOTIFY_JUDGE_ID: 1
   # Centrifugo is optional for testing; failures are swallowed:
   CENTRIFUGO_URL: http://localhost:1377
   CENTRIFUGO_API_KEY: foo

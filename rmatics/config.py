@@ -72,7 +72,6 @@ class BaseConfig:
     # notification
     EJUDGE_NOTIFY_STREAM = os.getenv('EJUDGE_NOTIFY_STREAM', 'ejudge.notify')
     EJUDGE_NOTIFY_GROUP = os.getenv('EJUDGE_NOTIFY_GROUP', 'rmatics')
-    EJUDGE_NOTIFY_JUDGE_ID = os.getenv('EJUDGE_NOTIFY_JUDGE_ID', None)
 
     CENTRIFUGO_URL = os.getenv('CENTRIFUGO_URL', 'http://localhost:1377')
     CENTRIFUGO_API_KEY = os.getenv('CENTRIFUGO_API_KEY', 'foo')
