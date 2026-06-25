@@ -217,6 +217,7 @@ def handle_run_message(timestamp, run_data: dict):
     if test is not None:
         values[Run.ejudge_test_num] = test
 
+    values[Run.ejudge_run_id] = ej_run_id
     values[Run.ejudge_last_timestamp] = timestamp
 
     rmatics_run_id = _rmatics_run_id(run_data)
