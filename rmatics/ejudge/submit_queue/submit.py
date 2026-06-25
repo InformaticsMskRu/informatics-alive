@@ -112,8 +112,9 @@ class Submit:
 
     @retry_on_exception(sa_exc.OperationalError, times=4)
     def _add_info_from_ejudge(self, run, ejudge_run_id,
-                              judge_id, status: EjudgeStatuses):
-        run.ejudge_status = status.value
+                              judge_id, status: Optional[EjudgeStatuses] = None):
+        if status is not None:
+            run.ejudge_status = status.value
         run.ejudge_run_id = ejudge_run_id
         run.judge_id = judge_id
 
@@ -191,6 +192,7 @@ class Submit:
                 url=entry_url,
                 sender_user_id=sender_user_id,
                 token=entry_token,
+                ext_user_id=self.run_id
             )
         except Exception:
             current_app.logger.exception(
@@ -203,7 +205,7 @@ class Submit:
             if code != 0:
                 raise ValueError(f'Ejudge returned status code {code}')
             ejudge_run_id = ejudge_response.get('run_id')
-            self._add_info_from_ejudge(run, ejudge_run_id, judge_id, EjudgeStatuses(run.status))
+            self._add_info_from_ejudge(run, ejudge_run_id, judge_id)
             current_app.logger.info(f'Run #{self.run_id} successfully updated')
         except (TypeError, KeyError, ValueError):
             self._add_info_from_ejudge(run, None, judge_id, EjudgeStatuses.RMATICS_SUBMIT_ERROR)

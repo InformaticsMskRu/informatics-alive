@@ -68,14 +68,14 @@ def _resolve_judge(judge_id: Optional[int]):
     return url, token
 
 
-def parse_testing_report(xml_text: str, run_id: int) -> dict:
-    """
-    testing-report XML нового ejudge → протокол в формате фронта.
+def _rmatics_run_id(run_data: dict) -> Optional[int]:
+    if run_data.get('ext_user_kind') != 'u64':
+        return None
+    return _to_int(run_data.get('ext_user'))
 
-    Складываем сразу «развёрнутый» вид (ключ tests), чтобы unmarshal_protocol
-    отдал его как есть, не заходя в compact-ветку (ключ t) — в текущем коде она
-    к тому же ссылается на несуществующий fill_str_status.
-    """
+
+
+def parse_testing_report(xml_text: str, run_id: int) -> dict:
     root = ET.fromstring(xml_text)
 
     tests = {}
@@ -219,18 +219,15 @@ def handle_run_message(timestamp, run_data: dict, judge_id: Optional[int]):
 
     values[Run.ejudge_last_timestamp] = timestamp
 
-    if not values:
-        return
+    rmatics_run_id = _rmatics_run_id(run_data)
 
-    if judge_id is None:
-        stmt = update(Run).where(and_(Run.ejudge_run_id == ej_run_id, Run.ejudge_contest_id == ej_contest_id, Run.ejudge_last_timestamp < timestamp))
-    else:
-        stmt = update(Run).where(and_(Run.ejudge_run_id == ej_run_id, Run.ejudge_contest_id == ej_contest_id, Run.judge_id == judge_id, Run.ejudge_last_timestamp < timestamp))
+    where = and_(Run.id == rmatics_run_id,
+                     Run.ejudge_last_timestamp < timestamp)
 
-    applied = db.session.execute(stmt.values(values)).rowcount
+    applied = db.session.execute(update(Run).where(where).values(values)).rowcount
     db.session.commit()
 
-    run = _find_run(ej_run_id, ej_contest_id, judge_id)
+    run = db.session.query(Run).get(rmatics_run_id)
 
     if run is None:
         current_app.logger.warning(

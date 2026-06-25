@@ -75,7 +75,7 @@ class RunAPI(MethodView):
         judge = get_judge(run.judge_id) if run.judge_id else None
         ejudge_url = (judge.url if judge else None) \
             or run.ejudge_url \
-            or current_app.config['EJUDGE_NEW_CLIENT_URL']
+            or current_app.config['EJUDGE_NEW_MASTER_URL']
 
         # A run was never processed when no judge was recorded (judge_id for new runs,
         # ejudge_url for old runs). In that case skip creating a rejudge archive record.

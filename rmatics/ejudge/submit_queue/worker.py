@@ -33,8 +33,8 @@ class SubmitWorker(Greenlet):
         while True:
             try:
                 with self._ctx:
-                    self.ejudge_url = current_app.config['EJUDGE_NEW_CLIENT_URL']
-                    current_app.logger.info('Worker started')
+                    self.ejudge_url = current_app.config['EJUDGE_NEW_MASTER_URL']
+                    current_app.logger.info(f'Worker started with url {self.ejudge_url}')
                     while True:
                         self.handle_submit()
             except sa_exc.OperationalError:

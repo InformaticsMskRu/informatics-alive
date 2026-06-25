@@ -63,7 +63,7 @@ class BaseConfig:
 
     # services
     EJUDGE_NEW_CLIENT_URL = os.getenv('EJUDGE_NEW_CLIENT_URL', 'http://localhost/cgi-bin/new-client')
-    EJUDGE_NEW_CLIENT_URL = os.getenv('EJUDGE_NEW_MASTER_URL', 'http://localhost/cgi-bin/new-master')
+    EJUDGE_NEW_MASTER_URL = os.getenv('EJUDGE_NEW_MASTER_URL', 'http://localhost/cgi-bin/new-master')
     EJUDGE_MASTER_TOKEN = os.getenv('EJUDGE_MASTER_TOKEN', 'token')
     JUDGES_CONFIG_PATH = os.getenv('JUDGES_CONFIG_PATH', None)
     DEFAULT_JUDGE_ID = os.getenv('DEFAULT_JUDGE_ID', None)

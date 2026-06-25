@@ -28,7 +28,8 @@ def report_error(code, login_data, submit_data, file, filename, user_id, addon =
 
 
 def submit(run_file, contest_id, prob_id, lang_id, filename, url,
-           sender_user_id=5, token=None):
+           sender_user_id=5, token=None, ext_user_id=None):
+    current_app.logger.info('Request is possible!')
     files = {'file' : (filename, run_file)}
 
     submit_data = {
@@ -36,9 +37,13 @@ def submit(run_file, contest_id, prob_id, lang_id, filename, url,
         'action' : 'submit-run',
         'problem': prob_id,
         'prob_id': prob_id,
-        'sender_user_id': sender_user_id,
+        # 'sender_user_id': None,
         'contest_id': contest_id,
     }
+    
+    if ext_user_id is not None:
+        submit_data['ext_user_kind'] = 'u64'
+        submit_data['ext_user'] = str(ext_user_id)
 
     effective_token = token or current_app.config.get('EJUDGE_MASTER_TOKEN')
     headers = {

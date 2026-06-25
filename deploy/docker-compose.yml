@@ -1,18 +1,16 @@
-version: '3'
-
 x-rmatics-env: &rmatics-env
   FLASK_ENV: development
   PYTHONPATH: /code
   FLASK_APP: wsgi:application
-  SECRET_KEY: test-secret
+  SECRET_KEY: ${SECRET_KEY}
   URL_ENCODER_ALPHABET: abcdefg
-  SQLALCHEMY_DATABASE_URI: mysql+pymysql://rmatics:dbpassword@ejudge-server:3306/pynformatics
-  MONGO_URI: mongodb://ejudge-server:27017/pynformatics
-  REDIS_URL: redis://rmatics:dbpassword@ejudge-server:6379/0
+  SQLALCHEMY_DATABASE_URI: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/pynformatics
+  MONGO_URI: mongodb://${MONGO_HOST}:${MONGO_PORT}/pynformatics
+  REDIS_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
   # ---- ejudge integration (point these at your ejudge) ----
-  EJUDGE_NEW_CLIENT_URL: http://172.17.0.1/cgi-bin/new-client
-  EJUDGE_NEW_MASTER_URL: http://172.17.0.1/cgi-bin/new-master
-  EJUDGE_MASTER_TOKEN: AQAAXud0OmWugwNNeCwQN8LSP801SFHyu4a21GmqpmdV-Zw
+  EJUDGE_NEW_CLIENT_URL: ${EJUDGE_NEW_CLIENT_URL}
+  EJUDGE_NEW_MASTER_URL: ${EJUDGE_NEW_MASTER_URL}
+  EJUDGE_MASTER_TOKEN: ${EJUDGE_MASTER_TOKEN}
   # Optional multi-judge config; leave unset for a single ejudge:
   JUDGES_CONFIG_PATH: /code/deploy/judges.json
   DEFAULT_JUDGE_ID: 1
@@ -38,7 +36,7 @@ services:
   submit-worker:
     image: rmatics:local
     environment: *rmatics-env
-    command: python /code/rmatics/scripts/submit_workers.py --workers 2
+    command: python /code/rmatics/scripts/submit_workers.py --workers 1
 
   notify-worker:
     image: rmatics:local

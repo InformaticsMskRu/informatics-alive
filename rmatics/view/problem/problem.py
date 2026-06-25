@@ -132,7 +132,7 @@ class TrustedSubmitApi(MethodView):
         run.update_source(text)
 
         run_id = run.id
-        ejudge_url = current_app.config['EJUDGE_NEW_CLIENT_URL']
+        ejudge_url = current_app.config['EJUDGE_NEW_MASTER_URL']
 
         # Коммит должен быть до отправки в очередь иначе это гонка
         db.session.commit()
