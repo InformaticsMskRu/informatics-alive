@@ -37,7 +37,7 @@ def submit(run_file, contest_id, prob_id, lang_id, filename, url,
         'action' : 'submit-run',
         'problem': prob_id,
         'prob_id': prob_id,
-        # 'sender_user_id': None,
+        'sender_user_id': sender_user_id,
         'contest_id': contest_id,
     }
     
