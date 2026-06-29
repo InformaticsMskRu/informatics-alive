@@ -198,7 +198,10 @@ def handle_run_message(judge_id: int, timestamp, run_data: dict):
         values[Run.ejudge_test_num] = test
 
     values[Run.ejudge_run_id] = ej_run_id
-    values[Run.ejudge_run_uuid] = ej_run_uuid
+
+    if ej_run_uuid is not None:
+        values[Run.ejudge_run_uuid] = ej_run_uuid
+
     values[Run.ejudge_last_timestamp] = timestamp
 
     rmatics_run_id = _rmatics_run_id(run_data)

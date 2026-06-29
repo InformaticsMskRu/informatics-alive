@@ -67,25 +67,25 @@ class RunAPI(MethodView):
 
     def post(self, run_id: int):
         """ View for rejudge run"""
-        run = db.session.query(Run).get(run_id)
+        run: Run = db.session.query(Run).get(run_id)
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')
 
         rejudge = Rejudge(run_id=run.id,
-                          ejudge_contest_id=run.ejudge_contest_id,
-                          ejudge_url=ejudge_url)
+                          ejudge_contest_id=run.ejudge_contest_id)
         db.session.add(rejudge)
         db.session.flush([rejudge])
 
         run.move_protocol_to_rejudge_collection(rejudge.id)
 
-        queue_submit(run.id)
-
         run.ejudge_status = 377
         run.ejudge_test_num = None
         run.ejudge_score = None
+        run.ejudge_last_timestamp = 0
         db.session.add(run)
         db.session.commit()
+
+        queue_submit(run.id)
 
         return jsonify({})
 

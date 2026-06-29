@@ -4,6 +4,8 @@
     "url": "http://localhost/cgi-bin/new-master",
     "token": "your token here...",
     "sender_user_id": 1,
-    "lang_map": {}
+    "lang_map": {},
+    "mode": 2,
+    "queue_name": "ejudge.notify"
   }
 }

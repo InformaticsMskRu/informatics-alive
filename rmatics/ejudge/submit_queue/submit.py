@@ -110,12 +110,10 @@ class Submit:
         return run
 
     @retry_on_exception(sa_exc.OperationalError, times=4)
-    def _add_info_from_ejudge(self, run, ejudge_run_id,
-                              judge_id, status: Optional[EjudgeStatuses] = None):
+    def _add_info_from_ejudge(self, run, ejudge_run_id, status: Optional[EjudgeStatuses] = None):
         if status is not None:
             run.ejudge_status = status.value
         run.ejudge_run_id = ejudge_run_id
-        run.judge_id = judge_id
 
         db.session.add(run)
         db.session.commit()
@@ -163,8 +161,7 @@ class Submit:
             prob_id = problem.problem_id
 
         if judge_id is None:
-            current_app.logger.error(f'Cannot find judge_id for run #{self.run_id}')
-            return
+            judge_id = get_default_judge_id()
 
         judge = get_judge(judge_id)
         if judge is None:
@@ -206,7 +203,7 @@ class Submit:
             # self._add_info_from_ejudge(run, ejudge_run_id, judge_id)
             # current_app.logger.info(f'Run #{self.run_id} successfully updated')
         except (TypeError, KeyError, ValueError):
-            self._add_info_from_ejudge(run, None, judge_id, EjudgeStatuses.RMATICS_SUBMIT_ERROR)
+            self._add_info_from_ejudge(run, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR)
             ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')
             run.protocol = self.build_submit_error_protocol(ejudge_compiler_output)
             current_app.logger.error(f'Ejudge returned error for submit #{self.run_id}')

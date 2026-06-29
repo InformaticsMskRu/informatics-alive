@@ -17,7 +17,7 @@ class JudgeConfig:
     sender_user_id: int = field(default=5)
     lang_map: Dict[int, int] = field(default_factory=dict)
     mode: int = field(default=ConfigMode.NEW.value)
-    queue_name: str = field(default='ejudge.notify')
+    queue_name: Optional[str] = field(default=None)
 
     def get_token(self) -> Optional[str]:
         return self.token
@@ -37,11 +37,32 @@ def _load(path: str) -> Dict[int, JudgeConfig]:
             sender_user_id=cfg.get('sender_user_id', 5),
             lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()},
             mode=cfg.get('mode', ConfigMode.NEW.value),
-            queue_name=cfg.get('queue_name', 'ejudge.notify')
+            queue_name=cfg.get('queue_name', None)
         )
         for jid, cfg in data.items()
     }
 
+def _validate_and_build_queues(app: Flask, judges: Dict[int, JudgeConfig]) -> Optional[Dict[str, int]]:
+    queues = dict()
+    for jid in judges:
+        judge = judges[jid]
+        if judge.token is None:
+            app.logger.error(f'No token provided for judge {jid}')
+            return None
+        if judge.mode is None or judge.mode not in {mode.value for mode in ConfigMode}:
+            app.logger.error(f'Incorrect mode provided for judge {jid}')
+            return None
+        if judge.mode != ConfigMode.NEW.value:
+            continue
+        if judge.queue_name is None:
+            app.logger.error(f'No queue_name provided for judge {jid}')
+            return None
+        if judge.queue_name in queues:
+            app.logger.error(f'Queue name "{judge.queue_name}" is used for two judges')
+            return None
+        queues[judge.queue_name] = jid
+    
+    return queues
 
 def init_app(app: Flask) -> None:
     path = app.config.get('JUDGES_CONFIG_PATH')
@@ -51,17 +72,16 @@ def init_app(app: Flask) -> None:
     else:
         try:
             judges = _load(path)
-            queues = dict()
-            for jid in judges:
-                judge = judges[jid]
-                if judge.mode != ConfigMode.NEW.value:
-                    continue
-                if judge.queue_name in queues:
-                    app.logger.warning(f'Queue name "{judge.queue_name}" is used for two judges')
-                queues[judge.queue_name] = jid
-            app.extensions['judges'] = judges
-            app.extensions['queues'] = queues
-            app.logger.info(f'Loaded {len(app.extensions["judges"])} judge(s) from {path!r}')
+            queues = _validate_and_build_queues(app, judges)
+
+            if queues is not None:
+                app.extensions['judges'] = judges
+                app.extensions['queues'] = queues
+                app.logger.info(f'Loaded {len(app.extensions["judges"])} judge(s) from {path!r}')
+            else:
+                app.extensions['judges'] = {}
+                app.extensions['queues'] = {}
+
         except Exception:
             app.logger.exception(f'Failed to load judges config from {path!r}')
             app.extensions['judges'] = {}
@@ -69,10 +89,7 @@ def init_app(app: Flask) -> None:
 
     default_id = app.config.get('DEFAULT_JUDGE_ID')
     if not default_id:
-        app.logger.warning(
-            'DEFAULT_JUDGE_ID not set: runs using the default judge path will not '
-            'record judge_id, preventing protocol archiving on rejudge'
-        )
+        app.logger.error('DEFAULT_JUDGE_ID not set')
     else:
         try:
             default_id_int = int(default_id)

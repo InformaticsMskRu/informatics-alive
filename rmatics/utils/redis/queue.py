@@ -59,9 +59,6 @@ class RedisStreamsQueue:
                     raise
 
     def get(self):
-        if len(self.streams) == 0:
-            current_app.logger.error("no streams provided")
-            raise RuntimeError
         resp = redis.xreadgroup(
             groupname=self.group,
             consumername=self.consumer,
@@ -72,9 +69,6 @@ class RedisStreamsQueue:
         return resp
 
     def get_blocking(self, timeout=0):
-        if len(self.streams) == 0:
-            current_app.logger.error("no streams provided")
-            exit(123)
         resp = redis.xreadgroup(
             groupname=self.group,
             consumername=self.consumer,

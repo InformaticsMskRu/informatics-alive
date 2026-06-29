@@ -35,6 +35,8 @@ class NotifyWorker(Greenlet):
             try:
                 with self._ctx:
                     streams = get_all_streams()
+                    if len(streams) == 0: # TODO: убрать, когда добавим обработку old
+                        break
                     group = current_app.config['EJUDGE_NOTIFY_GROUP']
                     consumer = f"{group}.{self.id}"
 
