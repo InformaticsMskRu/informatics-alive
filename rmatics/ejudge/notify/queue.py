@@ -12,7 +12,7 @@ import requests
 from sqlalchemy import and_, update
 
 from rmatics import centrifugo_client
-from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
+from rmatics.ejudge.judges_config import get_judge, get_default_judge_id, get_jid_by_queue
 from rmatics.model.base import db
 from rmatics.model.run import Run
 from rmatics.utils.cacher.helpers import invalidate_monitor_cache_by_run
@@ -41,19 +41,10 @@ def _too_big(elem) -> bool:
 def _is_terminal(status: Optional[int]) -> bool:
     return status is not None and status not in NON_TERMINAL_STATUSES
 
-def _resolve_judge(judge_id: Optional[int]):
+def _resolve_judge(judge_id: int):
     """(url, token) ejudge'а, у которого спрашивать протокол."""
-    judge = get_judge(judge_id) if judge_id is not None else None
-
-    url = (
-        judge.url if judge else None
-    ) or current_app.config['EJUDGE_NEW_MASTER_URL']
-
-    token = (
-        judge.get_token() if judge else None
-    ) or current_app.config.get('EJUDGE_MASTER_TOKEN')
-
-    return url, token
+    judge = get_judge(judge_id)
+    return judge.url, judge.get_token()
 
 
 def _rmatics_run_id(run_data: dict) -> Optional[int]:
@@ -181,8 +172,9 @@ def fetch_protocol(
         return None
 
 
-def handle_run_message(timestamp, run_data: dict):
+def handle_run_message(judge_id: int, timestamp, run_data: dict):
     ej_run_id = _to_int(run_data.get('run_id'))
+    ej_run_uuid = run_data.get('run_uuid')
     ej_contest_id = _to_int(run_data.get('contest_id'))
 
     if ej_run_id is None or ej_contest_id is None:
@@ -206,6 +198,7 @@ def handle_run_message(timestamp, run_data: dict):
         values[Run.ejudge_test_num] = test
 
     values[Run.ejudge_run_id] = ej_run_id
+    values[Run.ejudge_run_uuid] = ej_run_uuid
     values[Run.ejudge_last_timestamp] = timestamp
 
     rmatics_run_id = _rmatics_run_id(run_data)
@@ -225,7 +218,7 @@ def handle_run_message(timestamp, run_data: dict):
         )
         return
     
-    run_id, problem_id, run_judge_id = run.id, run.problem_id, run.judge_id
+    run_id, problem_id = run.id, run.problem_id
     
     status = _to_int(run_data.get('status'))
 
@@ -238,7 +231,7 @@ def handle_run_message(timestamp, run_data: dict):
     invalidate_monitor_cache_by_run(run)
 
     if _is_terminal(status):
-        url, token = _resolve_judge(run_judge_id if run_judge_id is not None else get_default_judge_id())
+        url, token = _resolve_judge(judge_id)
         protocol = fetch_protocol(url, token, ej_contest_id, ej_run_id, run_id)
         if protocol is not None:
             run.protocol = protocol
@@ -247,7 +240,7 @@ def handle_run_message(timestamp, run_data: dict):
     current_app.logger.info(f'notify: Run #{run_id} -> status {status}')
 
 
-def process_message(raw: str):
+def process_message(judge_id: int, raw: str):
     """Разобрать одно сообщение из stream и применить его."""
     try:
         message = json.loads(raw)
@@ -260,21 +253,21 @@ def process_message(raw: str):
     timestamp = _to_int(message.get('server_time_us'))
     
     if msg_type == 'run':
-        handle_run_message(timestamp, message.get('run') or {})
+        handle_run_message(judge_id, timestamp, message.get('run') or {})
     else:
         current_app.logger.debug(f'notify: skip message type {msg_type!r}')
 
 class NotifyQueue(RedisStreamsQueue):
     
-    def __init__(self, stream, group, consumer):
-        super(NotifyQueue, self).__init__(stream=stream, group=group, consumer=consumer)
+    def __init__(self, streams, group, consumer):
+        super(NotifyQueue, self).__init__(streams=streams, group=group, consumer=consumer)
 
     def get_and_process(self):
         resp = super(NotifyQueue, self).get_blocking()
         current_app.logger.info('ejudge notification')
         if not resp:
             return
-        for _stream, messages in resp:
+        for stream, messages in resp:
             for message_id, fields in messages:
                 data = fields.get(b'data') or fields.get('data')
 
@@ -283,11 +276,15 @@ class NotifyQueue(RedisStreamsQueue):
 
                 try:
                     if data is not None:
-                        process_message(data)
+                        jid = get_jid_by_queue(stream.decode())
+                        if jid is None:
+                            current_app.logger.error(f'undefined judge_id for stream "{stream}"')
+                            continue
+                        process_message(jid, data)
                 except Exception:
                     current_app.logger.exception(
                         'notify-worker: failed to process message'
                     )
                     db.session.rollback()
                 finally:
-                    super(NotifyQueue, self).ack(message_id)
+                    super(NotifyQueue, self).ack(stream, message_id)

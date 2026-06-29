@@ -3,6 +3,7 @@ from gevent import Greenlet, sleep
 from sqlalchemy import exc as sa_exc
 
 from rmatics.model.base import db
+from rmatics.ejudge.judges_config import get_all_streams
 
 from .queue import NotifyQueue
 
@@ -33,11 +34,11 @@ class NotifyWorker(Greenlet):
         while True:
             try:
                 with self._ctx:
-                    stream = current_app.config['EJUDGE_NOTIFY_STREAM']
+                    streams = get_all_streams()
                     group = current_app.config['EJUDGE_NOTIFY_GROUP']
                     consumer = f"{group}.{self.id}"
 
-                    self.queue = NotifyQueue(stream, group, consumer)
+                    self.queue = NotifyQueue(streams, group, consumer)
 
                     current_app.logger.info('Worker started')
                     while True:

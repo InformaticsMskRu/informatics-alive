@@ -33,51 +33,56 @@ class RedisQueue:
 
 
 class RedisStreamsQueue:
-    def __init__(self, stream, group, consumer):
-        self.stream = stream
+    def __init__(self, streams, group, consumer):
+        self.streams = streams
         self.group = group
         self.consumer = consumer
 
         self._ensure_group()
 
     def _ensure_group(self):
-        try:
-            redis.xgroup_create(
-                name=self.stream,
-                groupname=self.group,
-                id="0",
-                mkstream=True
-            )
+        for stream in self.streams:
+            try:
+                redis.xgroup_create(
+                    name=stream,
+                    groupname=self.group,
+                    id="0",
+                    mkstream=True
+                )
 
-            current_app.logger.info(
-                f"created redis stream group {self.group} on {self.stream}"
-            )
-        except Exception as e:
-            # BUSYGROUP → группа уже существует
-            if "BUSYGROUP" not in str(e):
-                raise
+                current_app.logger.info(
+                    f"created redis stream group {self.group} on {stream}"
+                )
+            except Exception as e:
+                # BUSYGROUP → группа уже существует
+                if "BUSYGROUP" not in str(e):
+                    raise
 
     def get(self):
+        if len(self.streams) == 0:
+            current_app.logger.error("no streams provided")
+            raise RuntimeError
         resp = redis.xreadgroup(
             groupname=self.group,
             consumername=self.consumer,
-            streams={self.stream: ">"},
-            count=1,
+            streams={stream: ">" for stream in self.streams},
             block=0
         )
 
         return resp
 
     def get_blocking(self, timeout=0):
+        if len(self.streams) == 0:
+            current_app.logger.error("no streams provided")
+            exit(123)
         resp = redis.xreadgroup(
             groupname=self.group,
             consumername=self.consumer,
-            streams={self.stream: ">"},
-            count=1,
+            streams={stream: ">" for stream in self.streams},
             block=timeout * 1000 if timeout else 0
         )
 
         return resp
 
-    def ack(self, message_id):
-        redis.xack(self.stream, self.group, message_id)
+    def ack(self, stream, message_id):
+        redis.xack(stream, self.group, message_id)

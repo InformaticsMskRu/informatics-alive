@@ -71,25 +71,15 @@ class RunAPI(MethodView):
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')
 
-        # Resolve target ejudge URL: named judge > legacy ejudge_url column > system default
-        judge = get_judge(run.judge_id) if run.judge_id else None
-        ejudge_url = (judge.url if judge else None) \
-            or run.ejudge_url \
-            or current_app.config['EJUDGE_NEW_MASTER_URL']
+        rejudge = Rejudge(run_id=run.id,
+                          ejudge_contest_id=run.ejudge_contest_id,
+                          ejudge_url=ejudge_url)
+        db.session.add(rejudge)
+        db.session.flush([rejudge])
 
-        # A run was never processed when no judge was recorded (judge_id for new runs,
-        # ejudge_url for old runs). In that case skip creating a rejudge archive record.
-        never_processed = run.judge_id is None and run.ejudge_url is None
-        if not never_processed:
-            rejudge = Rejudge(run_id=run.id,
-                              ejudge_contest_id=run.ejudge_contest_id,
-                              ejudge_url=ejudge_url)
-            db.session.add(rejudge)
-            db.session.flush([rejudge])
+        run.move_protocol_to_rejudge_collection(rejudge.id)
 
-            run.move_protocol_to_rejudge_collection(rejudge.id)
-
-        queue_submit(run.id, ejudge_url)
+        queue_submit(run.id)
 
         run.ejudge_status = 377
         run.ejudge_test_num = None

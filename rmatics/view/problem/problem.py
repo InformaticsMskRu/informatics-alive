@@ -31,60 +31,6 @@ from rmatics.view.problem.serializers.run import RunSchema
 
 DEFAULT_MOODLE_CONTEXT_SOURCE = 10
 
-
-def _get_judge_entry(problem, lang_id: int, user_id: int):
-    """Return the highest-priority matching judges_settings entry for (lang_id, user_id).
-
-    judges_settings is a list of entries:
-      {
-        "judge_id":  <str>,    # optional — references a judge in judges.json
-        "contest_id": <int>,   # required — contest_id inside that ejudge
-        "problem_id": <int>,   # required — prob_id inside the contest
-        "lang_ids":  [<int>],  # null / absent matches any language
-        "user_ids":  [<int>]   # null / absent matches any moodle user
-      }
-
-    An entry is a candidate when BOTH filters match:
-      - lang_ids is null  OR  lang_id  in lang_ids
-      - user_ids is null  OR  user_id  in user_ids
-
-    judges_settings entry shape:
-      {
-        "judge_id":  <int>,    # optional — references a judge in judges.json by numeric id
-        "contest_id": <int>,   # required
-        "problem_id": <int>,   # required
-        "lang_ids":  [<int>],  # null / absent matches any language
-        "user_ids":  [<int>]   # null / absent matches any moodle user
-      }
-
-    Entries missing contest_id or problem_id are skipped with a warning.
-    Among valid candidates, higher specificity (more filters set) wins;
-    listed order breaks ties. Returns None when no entry matches.
-    """
-    settings = problem.judges_settings
-    if not settings:
-        return None
-
-    candidates = []
-    for entry in settings:
-        lang_ids = entry.get('lang_ids')
-        user_ids = entry.get('user_ids')
-        if (lang_ids is None or lang_id in lang_ids) and \
-           (user_ids is None or user_id in user_ids):
-            candidates.append(entry)
-
-    if not candidates:
-        return None
-
-    candidates.sort(
-        key=lambda e: -(
-            (e.get('lang_ids') is not None) +
-            (e.get('user_ids') is not None)
-        )
-    )
-    return candidates[0]
-
-
 class TrustedSubmitApi(MethodView):
     post_args = {
         'lang_id': fields.Integer(required=True),
@@ -161,13 +107,6 @@ class TrustedSubmitApi(MethodView):
                 duplicate.lang_id == language_id:
             raise BadRequest('Source file is duplicate of your previous submission')
 
-        entry = _get_judge_entry(problem, language_id, user_id)
-
-        if entry is not None:
-            judge_id = entry.get('judge_id')
-        else:
-            judge_id = get_default_judge_id()
-
         # There is not constraint on statement_id
         run = Run(
             user_id=user_id,
@@ -178,7 +117,6 @@ class TrustedSubmitApi(MethodView):
             lang_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
-            judge_id=judge_id,
 
             # Context related properties
             context_source=context_source,
@@ -195,12 +133,11 @@ class TrustedSubmitApi(MethodView):
         run.update_source(text)
 
         run_id = run.id
-        ejudge_url = current_app.config['EJUDGE_NEW_MASTER_URL']
 
         # Коммит должен быть до отправки в очередь иначе это гонка
         db.session.commit()
 
-        queue_submit(run_id, ejudge_url)
+        queue_submit(run_id)
         return jsonify({
             'run_id': run_id
         })

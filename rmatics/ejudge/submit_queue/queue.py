@@ -33,15 +33,14 @@ class SubmitQueue(RedisQueue):
     def get_last_get_id(self):
         return int(redis.get(last_get_id_key(self.key)) or '0')
 
-    def submit(self, run_id, ejudge_url):
-        current_app.logger.info('Submit {} {}'.format(run_id, ejudge_url))
+    def submit(self, run_id):
+        current_app.logger.info('Submit {}'.format(run_id))
         # INCR и RPUSH атомарны сами по себе — WATCH/transaction здесь не нужен
         # (и ломался на redis-py >= 3.0: запись watched-ключей в immediate-режиме
         # давала вечный WatchError). Уникальность id обеспечивает INCR.
         submit = Submit(
             id=redis.incr(last_put_id_key(self.key)),
             run_id=run_id,
-            ejudge_url=ejudge_url,
         )   
         self.put(submit.encode())
         return submit

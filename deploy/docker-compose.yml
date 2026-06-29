@@ -7,15 +7,10 @@ x-rmatics-env: &rmatics-env
   SQLALCHEMY_DATABASE_URI: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/pynformatics
   MONGO_URI: mongodb://${MONGO_HOST}:${MONGO_PORT}/pynformatics
   REDIS_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
-  # ---- ejudge integration (point these at your ejudge) ----
-  EJUDGE_NEW_CLIENT_URL: ${EJUDGE_NEW_CLIENT_URL}
-  EJUDGE_NEW_MASTER_URL: ${EJUDGE_NEW_MASTER_URL}
-  EJUDGE_MASTER_TOKEN: ${EJUDGE_MASTER_TOKEN}
   # Optional multi-judge config; leave unset for a single ejudge:
   JUDGES_CONFIG_PATH: /code/deploy/judges.json
-  DEFAULT_JUDGE_ID: 1
+  DEFAULT_JUDGE_ID: ${DEFAULT_JUDGE_ID}
   # Notification
-  EJUDGE_NOTIFY_STREAM: ejudge.notify
   EJUDGE_NOTIFY_GROUP: rmatics
   # Centrifugo is optional for testing; failures are swallowed:
   CENTRIFUGO_URL: http://localhost:1377
