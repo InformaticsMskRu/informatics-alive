@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 from flask import Flask, current_app
 
-class ConfigMode(Enum):
+class JudgeMode(Enum):
     OLD = 1
     NEW = 2
 
@@ -16,7 +16,7 @@ class JudgeConfig:
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
     lang_map: Dict[int, int] = field(default_factory=dict)
-    mode: int = field(default=ConfigMode.NEW.value)
+    mode: int = field(default=JudgeMode.NEW.value)
     queue_name: Optional[str] = field(default=None)
 
     def get_token(self) -> Optional[str]:
@@ -36,7 +36,7 @@ def _load(path: str) -> Dict[int, JudgeConfig]:
             token=cfg.get('token'),
             sender_user_id=cfg.get('sender_user_id', 5),
             lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()},
-            mode=cfg.get('mode', ConfigMode.NEW.value),
+            mode=cfg.get('mode', JudgeMode.NEW.value),
             queue_name=cfg.get('queue_name', None)
         )
         for jid, cfg in data.items()
@@ -49,10 +49,10 @@ def _validate_and_build_queues(app: Flask, judges: Dict[int, JudgeConfig]) -> Op
         if judge.token is None:
             app.logger.error(f'No token provided for judge {jid}')
             return None
-        if judge.mode is None or judge.mode not in {mode.value for mode in ConfigMode}:
+        if judge.mode is None or judge.mode not in {mode.value for mode in JudgeMode}:
             app.logger.error(f'Incorrect mode provided for judge {jid}')
             return None
-        if judge.mode != ConfigMode.NEW.value:
+        if judge.mode != JudgeMode.NEW.value:
             continue
         if judge.queue_name is None:
             app.logger.error(f'No queue_name provided for judge {jid}')

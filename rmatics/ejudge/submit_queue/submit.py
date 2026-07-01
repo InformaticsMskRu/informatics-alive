@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from rmatics import centrifugo_client
 from rmatics.ejudge.ejudge_proxy import submit
-from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
+from rmatics.ejudge.judges_config import get_judge, get_default_judge_id, JudgeMode
 from rmatics.model.base import db
 from rmatics.model.run import Run
 from rmatics.utils.functions import attrs_to_dict
@@ -199,9 +199,10 @@ class Submit:
             code = ejudge_response['code']
             if code != 0:
                 raise ValueError(f'Ejudge returned status code {code}')
-            # ejudge_run_id = ejudge_response.get('run_id')
-            # self._add_info_from_ejudge(run, ejudge_run_id, judge_id)
-            # current_app.logger.info(f'Run #{self.run_id} successfully updated')
+            if judge.mode == JudgeMode.OLD.value:
+                ejudge_run_id = ejudge_response.get('run_id')
+                self._add_info_from_ejudge(run, ejudge_run_id, judge_id)
+                current_app.logger.info(f'Run #{self.run_id} successfully updated')
         except (TypeError, KeyError, ValueError):
             self._add_info_from_ejudge(run, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR)
             ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')

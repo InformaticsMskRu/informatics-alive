@@ -6,6 +6,7 @@ from pymongo.errors import PyMongoError, DuplicateKeyError
 from webargs.flaskparser import parser
 from werkzeug.exceptions import NotFound, BadRequest, InternalServerError
 from sqlalchemy import or_
+from typing import Optional
 
 from rmatics.ejudge.judges_config import get_judge
 from rmatics.ejudge.submit_queue import queue_submit
@@ -16,6 +17,9 @@ from rmatics.utils.cacher.helpers import invalidate_monitor_cache_by_run
 from rmatics.utils.response import jsonify
 from rmatics.view.problem.serializers.run import RunSchema
 
+from rmatics.ejudge.protocol import fetch_protocol
+
+from rmatics.utils.run import EjudgeStatuses
 
 POSSIBLE_SOURCE_ENCODINGS = ['utf-8', 'cp1251', 'windows-1251', 'ascii', 'koi8-r']
 
@@ -161,14 +165,28 @@ class ProtocolApi(MethodView):
 
         return jsonify(protocol)
 
+NON_TERMINAL_STATUSES = {
+    EjudgeStatuses.COMPILING.value,  # 98
+    EjudgeStatuses.RUNNING.value,    # 96
+    EjudgeStatuses.IN_QUEUE.value,   # 377
+}
 
-class UpdateRunFromEjudgeAPI(MethodView):
+def _is_terminal(status: Optional[int]) -> bool:
+    return status is not None and status not in NON_TERMINAL_STATUSES
+
+def _resolve_judge(judge_id: int):
+    """(url, token) ejudge'а, у которого спрашивать протокол."""
+    judge = get_judge(judge_id)
+    return judge.url, judge.get_token()
+
+class UpdateRunFromOldEjudgeAPI(MethodView):
 
     def post(self):
         data = request.get_json(force=True)
+        judge_id = data['judge_id']
         ejudge_run_id = data['run_id']
         ejudge_contest_id = data['contest_id']
-        mongo_protocol_id = data.get('mongo_protocol_id', None)
+        status = data['status']
 
         run = db.session.query(Run) \
             .filter_by(ejudge_run_id=ejudge_run_id,
@@ -186,23 +204,18 @@ class UpdateRunFromEjudgeAPI(MethodView):
         if errors:
             raise BadRequest(errors)
 
-        if mongo_protocol_id:
-            # If it is we should invalidate cache
-            invalidate_monitor_cache_by_run(run)
-            current_app.logger.debug('Cache invalidated')
-            try:
-                result = mongo.db.protocol.update_one({'_id': ObjectId(mongo_protocol_id)},
-                                                      {'$set': {'run_id': received_run.id}})
-                if not result.modified_count:
-                    raise BadRequest(f'Cannot find protocol by _id {mongo_protocol_id}')
-            except DuplicateKeyError:
-                current_app.logger.exception('Found duplicate key for run_id')
-
-            except PyMongoError:
-                current_app.logger.exception('Looks like mongo is shutdown')
-                raise InternalServerError(f'Looks like mongo is shutdown')
-
         db.session.add(received_run)
         db.session.commit()
+
+        invalidate_monitor_cache_by_run(run)
+
+        if _is_terminal(status):
+            url, token = _resolve_judge(judge_id)
+            try:
+                protocol = fetch_protocol(url, token, ejudge_contest_id, ejudge_run_id, run.id)
+                if protocol is not None:
+                    run.protocol = protocol
+            except:
+                raise BadRequest("Protocol was not found")
 
         return jsonify({}, 200)
