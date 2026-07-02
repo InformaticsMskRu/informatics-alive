@@ -8,7 +8,7 @@ x-rmatics-env: &rmatics-env
   MONGO_URI: mongodb://${MONGO_HOST}:${MONGO_PORT}/pynformatics
   REDIS_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
   CELERY_BROKER_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
-  # Optional multi-judge config; leave unset for a single ejudge:
+
   JUDGES_CONFIG_PATH: /code/deploy/judges.json
   DEFAULT_JUDGE_ID: ${DEFAULT_JUDGE_ID}
   # Notification

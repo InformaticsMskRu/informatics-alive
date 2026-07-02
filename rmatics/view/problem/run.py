@@ -188,6 +188,31 @@ def _resolve_judge(judge_id: int):
     judge = get_judge(judge_id)
     return judge.url, judge.get_token()
 
+def _get_run(data) -> Run:
+    try:
+        run_id = data.get('rmatics_run_id')
+        if run_id is not None:
+            run = db.session.query(Run) \
+                .filter_by(id=int(run_id)) \
+                .one_or_none()
+        else:
+            run = db.session.query(Run) \
+                .filter_by(ejudge_run_uuid=data["run_uuid"],
+                       judge_id=data["judge_id"]) \
+                .one_or_none()
+    except:
+        msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}. Retry...'
+        logger.exception(msg)
+        raise BadRequest(msg)
+    
+    if run is None:
+        msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}. Retry...'
+        logger.exception(msg)
+        raise BadRequest(msg)
+
+    return run
+
+
 @shared_task(name='rmatics.view.problem.run.upd_run', bind=True, max_retries=None, retry_backoff=True)
 def upd_run(self, data) -> dict:
     ejudge_run_uuid = data['run_uuid']
@@ -200,24 +225,7 @@ def upd_run(self, data) -> dict:
         msg = f'Incorrect judge_id'
         raise BadRequest(msg)
     
-    try:
-        run = db.session.query(Run) \
-            .filter_by(ejudge_run_uuid=ejudge_run_uuid,
-                       judge_id=judge_id) \
-            .one_or_none()
-    except:
-        msg = f'Cannot find Run with  \
-                judge_id={judge_id},  \
-                ejudge_run_uuid={ejudge_run_uuid}. Retry...'
-        logger.exception(msg)
-        self.retry(exc=BadRequest(msg), countdown=2 * self.request.retries)
-
-    if run is None:
-        msg = f'Cannot find Run with  \
-                judge_id={judge_id},  \
-                ejudge_run_uuid={ejudge_run_uuid}. Retry...'
-        logger.exception(msg)
-        self.retry(exc=BadRequest(msg), countdown=2 * self.request.retries)
+    run = _get_run(data)
 
     run_schema = FromEjudgeRunSchema(context={'instance': run})
     received_run, errors = run_schema.load(data)
@@ -230,41 +238,22 @@ def upd_run(self, data) -> dict:
 
     return {
         "judge_id": judge_id,
-        "ejudge_contest_id": ejudge_contest_id,
-        "ejudge_run_id": ejudge_run_id,
-        "ejudge_run_uuid": ejudge_run_uuid,
-        "run_id": int(run.id),
+        "contest_id": ejudge_contest_id,
+        "run_id": ejudge_run_id,
+        "run_uuid": ejudge_run_uuid,
+        "rmatics_run_id": int(run.id),
         "status": status
     }
 
 @shared_task(name='rmatics.view.problem.run.load_protocol', bind=True, default_retry_delay=30, max_retries=5)
 def load_protocol(self, data):
-
-    try:
-        run = db.session.query(Run) \
-            .filter_by(ejudge_run_uuid=data["ejudge_run_uuid"],
-                       judge_id=data["judge_id"]) \
-            .one_or_none()
-    except:
-        msg = f'Cannot find Run with  \
-                judge_id={data["judge_id"]},  \
-                ejudge_run_uuid={data["ejudge_run_uuid"]}. Retry...'
-        logger.exception(msg)
-        raise BadRequest(msg)
-    
-    if run is None:
-        msg = f'Cannot find Run with  \
-                judge_id={data["judge_id"]},  \
-                ejudge_run_uuid={data["ejudge_run_uuid"]}. Retry...'
-        logger.exception(msg)
-        raise BadRequest(msg)
-
+    run = _get_run(data)
     invalidate_monitor_cache_by_run(run)
 
     if _is_terminal(data["status"]):
         url, token = _resolve_judge(data["judge_id"])
         try:
-            protocol = fetch_protocol(url, token, data["ejudge_contest_id"], data["ejudge_run_id"], data["run_id"])
+            protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], data["rmatics_run_id"])
             if protocol is not None:
                 run.protocol = protocol
         except Exception as exc:
@@ -279,7 +268,7 @@ def make_upd_chain():
     upd_chain = upd_run.s() | load_protocol.s()
     return upd_chain
 
-class UpdateRunFromOldEjudgeAPI(MethodView):
+class UpdateRunFromEjudgeAPI(MethodView):
 
     def post(self):
         data = request.get_json(force=True)
