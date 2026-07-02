@@ -13,8 +13,8 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
-from rmatics.ejudge.submit_queue import (
-    make_submit_task_chain,
+from rmatics.ejudge.submit_queue.task import (
+    submit_task,
 )
 
 from rmatics.model import CourseModule
@@ -136,8 +136,8 @@ class TrustedSubmitApi(MethodView):
         # Коммит должен быть до отправки в очередь иначе это гонка
         db.session.commit()
 
-        submit_task_chain = make_submit_task_chain()
-        submit_task_chain.delay(run.id)
+        result = submit_task.delay(run.id)
+        print(result)
 
         return jsonify({
             'run_id': run_id

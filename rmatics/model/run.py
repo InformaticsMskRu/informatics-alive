@@ -46,6 +46,7 @@ class Run(db.Model):
     ejudge_run_id = db.Column('ej_run_id', db.Integer)
     ejudge_contest_id = db.Column('ej_contest_id', db.Integer)
     ejudge_run_uuid = db.Column('ej_run_uuid', db.String(40))
+    judge_id = db.Column(db.SmallInteger, nullable=True)
 
     ejudge_score = db.Column('ej_score', db.Integer)
     ejudge_status = db.Column('ej_status', db.Integer)

@@ -2,7 +2,8 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 
 from typing import Optional
-from rmatics.model import Run, db
+from rmatics.model import Run
+from rmatics.model.base import db
 from sqlalchemy.orm import joinedload
 from rmatics.utils.run import EjudgeStatuses
 
@@ -82,10 +83,12 @@ def _get_run(run_id) -> Optional[Run]:
 
     return run
 
-def _add_info_from_ejudge(run, ejudge_run_id, status: Optional[EjudgeStatuses] = None):
+def _add_info_from_ejudge(run, ejudge_run_id, ejudge_run_uuid, status, judge_id):
     if status is not None:
         run.ejudge_status = status.value
     run.ejudge_run_id = ejudge_run_id
+    run.ejudge_run_uuid = ejudge_run_uuid
+    run.judge_id = judge_id
 
     db.session.add(run)
     db.session.commit()
@@ -99,7 +102,7 @@ def _build_submit_error_protocol(run_id, ejudge_respone: str) -> dict:
         r["ejResp"] = ejudge_respone
     return r
 
-@shared_task(ignore_result=True, retry=False)
+@shared_task(name='rmatics.ejudge.submit_queue.task.submit_task', ignore_result=True, retry=False)
 def submit_task(run_id):
     logger.info(f'Trying to send run #{run_id} to ejudge')
 
@@ -168,10 +171,11 @@ def submit_task(run_id):
             raise ValueError(f'Ejudge returned status code {code}')
         if judge.mode == JudgeMode.OLD.value:
             ejudge_run_id = ejudge_response.get('run_id')
-            _add_info_from_ejudge(run, ejudge_run_id, judge_id)
+            ejudge_run_uuid = ejudge_response.get('run_uuid')
+            _add_info_from_ejudge(run, ejudge_run_id, ejudge_run_uuid, None, judge_id)
             logger.info(f'Run #{run_id} successfully updated')
     except (TypeError, KeyError, ValueError):
-        _add_info_from_ejudge(run, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR)
+        _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, judge_id)
         ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')
         run.protocol = _build_submit_error_protocol(ejudge_compiler_output)
         logger.error(f'Ejudge returned error for submit #{run_id}')

@@ -74,9 +74,11 @@ class BaseConfig:
 
     # celery
     broker_url = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-    task_ignore_result = bool_(os.getenv('CELERY_TASK_IGNORE_RESULT', True))
+    result_backend = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+    task_ignore_result = bool_(os.getenv('CELERY_TASK_IGNORE_RESULT', False))
     imports = (
-        'rmatics_alive.tasks'
+        'rmatics.ejudge.submit_queue.task',
+        'rmatics.view.problem.run'
     )
     worker_max_memory_per_child = 250_000  # 250MB
     broker_transport_options = {

@@ -45,7 +45,7 @@ def parse_bson_testing_report(bts: bytes, run_id: int) -> dict:
             except KeyError:
                 string_status = status_code
 
-            tests[num] = {
+            tests[str(num)] = {
                 'input': _text(inp),
                 'big_input': _too_big(inp),
                 'corr': _text(corr),

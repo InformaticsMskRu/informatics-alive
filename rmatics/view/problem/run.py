@@ -1,3 +1,8 @@
+import functools
+
+from celery import shared_task
+from celery.utils.log import get_task_logger
+
 from bson import ObjectId
 from flask import request, current_app
 from flask.views import MethodView
@@ -9,7 +14,7 @@ from sqlalchemy import or_
 from typing import Optional
 
 from rmatics.ejudge.judges_config import get_judge
-from rmatics.ejudge.submit_queue import make_submit_task_chain
+from rmatics.ejudge.submit_queue.task import submit_task
 from rmatics.model.base import db, mongo
 from rmatics.model.rejudge import Rejudge
 from rmatics.model.run import Run
@@ -20,6 +25,10 @@ from rmatics.view.problem.serializers.run import RunSchema
 from rmatics.ejudge.protocol import fetch_protocol
 
 from rmatics.utils.run import EjudgeStatuses
+
+do_once = functools.lru_cache(1)
+
+logger = get_task_logger(__name__)
 
 POSSIBLE_SOURCE_ENCODINGS = ['utf-8', 'cp1251', 'windows-1251', 'ascii', 'koi8-r']
 
@@ -89,8 +98,7 @@ class RunAPI(MethodView):
         db.session.add(run)
         db.session.commit()
 
-        submit_task_chain = make_submit_task_chain()
-        submit_task_chain.delay(run.id)
+        submit_task.delay(run.id)
 
         return jsonify({})
 
@@ -180,43 +188,103 @@ def _resolve_judge(judge_id: int):
     judge = get_judge(judge_id)
     return judge.url, judge.get_token()
 
+@shared_task(name='rmatics.view.problem.run.upd_run', bind=True, max_retries=None, retry_backoff=True)
+def upd_run(self, data) -> dict:
+    ejudge_run_uuid = data['run_uuid']
+    ejudge_run_id = int(data['run_id'])
+    ejudge_contest_id = int(data['contest_id'])
+    status = int(data['status'])
+    try:
+        judge_id = int(data['judge_id'])
+    except:
+        msg = f'Incorrect judge_id'
+        raise BadRequest(msg)
+    
+    try:
+        run = db.session.query(Run) \
+            .filter_by(ejudge_run_uuid=ejudge_run_uuid,
+                       judge_id=judge_id) \
+            .one_or_none()
+    except:
+        msg = f'Cannot find Run with  \
+                judge_id={judge_id},  \
+                ejudge_run_uuid={ejudge_run_uuid}. Retry...'
+        logger.exception(msg)
+        self.retry(exc=BadRequest(msg), countdown=2 * self.request.retries)
+
+    if run is None:
+        msg = f'Cannot find Run with  \
+                judge_id={judge_id},  \
+                ejudge_run_uuid={ejudge_run_uuid}. Retry...'
+        logger.exception(msg)
+        self.retry(exc=BadRequest(msg), countdown=2 * self.request.retries)
+
+    run_schema = FromEjudgeRunSchema(context={'instance': run})
+    received_run, errors = run_schema.load(data)
+    if errors:
+        logger.exception("Failed to load schema. Retry...")
+        self.retry(exc=BadRequest(errors), countdown=2 * self.request.retries)
+
+    db.session.add(received_run)
+    db.session.commit()  
+
+    return {
+        "judge_id": judge_id,
+        "ejudge_contest_id": ejudge_contest_id,
+        "ejudge_run_id": ejudge_run_id,
+        "ejudge_run_uuid": ejudge_run_uuid,
+        "run_id": int(run.id),
+        "status": status
+    }
+
+@shared_task(name='rmatics.view.problem.run.load_protocol', bind=True, default_retry_delay=30, max_retries=5)
+def load_protocol(self, data):
+
+    try:
+        run = db.session.query(Run) \
+            .filter_by(ejudge_run_uuid=data["ejudge_run_uuid"],
+                       judge_id=data["judge_id"]) \
+            .one_or_none()
+    except:
+        msg = f'Cannot find Run with  \
+                judge_id={data["judge_id"]},  \
+                ejudge_run_uuid={data["ejudge_run_uuid"]}. Retry...'
+        logger.exception(msg)
+        raise BadRequest(msg)
+    
+    if run is None:
+        msg = f'Cannot find Run with  \
+                judge_id={data["judge_id"]},  \
+                ejudge_run_uuid={data["ejudge_run_uuid"]}. Retry...'
+        logger.exception(msg)
+        raise BadRequest(msg)
+
+    invalidate_monitor_cache_by_run(run)
+
+    if _is_terminal(data["status"]):
+        url, token = _resolve_judge(data["judge_id"])
+        try:
+            protocol = fetch_protocol(url, token, data["ejudge_contest_id"], data["ejudge_run_id"], data["run_id"])
+            if protocol is not None:
+                run.protocol = protocol
+        except Exception as exc:
+            if self.request.retries < load_protocol.max_retries:
+                logger.info('retry protocol')
+                self.retry(exc=exc)
+            logger.warning('Failed to load protocol Max retries count exceed. Aborting.'
+                          f'Request args={data}')
+            raise exc
+
+def make_upd_chain():
+    upd_chain = upd_run.s() | load_protocol.s()
+    return upd_chain
+
 class UpdateRunFromOldEjudgeAPI(MethodView):
 
     def post(self):
         data = request.get_json(force=True)
-        judge_id = data['judge_id']
-        ejudge_run_id = data['run_id']
-        ejudge_contest_id = data['contest_id']
-        status = data['status']
 
-        run = db.session.query(Run) \
-            .filter_by(ejudge_run_id=ejudge_run_id,
-                       ejudge_contest_id=ejudge_contest_id) \
-            .one_or_none()
-
-        if run is None:
-            msg = f'Cannot find Run with  \
-                    ejudge_contest_id={ejudge_contest_id},  \
-                    ejudge_run_id={ejudge_run_id}'
-            raise BadRequest(msg)
-
-        run_schema = FromEjudgeRunSchema(context={'instance': run})
-        received_run, errors = run_schema.load(data)
-        if errors:
-            raise BadRequest(errors)
-
-        db.session.add(received_run)
-        db.session.commit()
-
-        invalidate_monitor_cache_by_run(run)
-
-        if _is_terminal(status):
-            url, token = _resolve_judge(judge_id)
-            try:
-                protocol = fetch_protocol(url, token, ejudge_contest_id, ejudge_run_id, run.id)
-                if protocol is not None:
-                    run.protocol = protocol
-            except:
-                raise BadRequest("Protocol was not found")
+        upd_chain = make_upd_chain()
+        result = upd_chain.delay(data)
 
         return jsonify({}, 200)
