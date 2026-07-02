@@ -72,6 +72,20 @@ class BaseConfig:
     CENTRIFUGO_URL = os.getenv('CENTRIFUGO_URL', 'http://localhost:1377')
     CENTRIFUGO_API_KEY = os.getenv('CENTRIFUGO_API_KEY', 'foo')
 
+    # celery
+    broker_url = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+    task_ignore_result = bool_(os.getenv('CELERY_TASK_IGNORE_RESULT', True))
+    imports = (
+        'rmatics_alive.tasks'
+    )
+    worker_max_memory_per_child = 250_000  # 250MB
+    broker_transport_options = {
+        'fanout_prefix': True,
+        'fanout_patterns': True,
+        'visibility_timeout': 24 * 60 * 60,  # 24 hours
+    }
+    worker_hijack_root_logger = False
+
 
 class DevConfig(BaseConfig):
     ...

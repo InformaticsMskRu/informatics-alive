@@ -7,6 +7,7 @@ x-rmatics-env: &rmatics-env
   SQLALCHEMY_DATABASE_URI: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/pynformatics
   MONGO_URI: mongodb://${MONGO_HOST}:${MONGO_PORT}/pynformatics
   REDIS_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
+  CELERY_BROKER_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
   # Optional multi-judge config; leave unset for a single ejudge:
   JUDGES_CONFIG_PATH: /code/deploy/judges.json
   DEFAULT_JUDGE_ID: ${DEFAULT_JUDGE_ID}
@@ -27,13 +28,7 @@ services:
       - "12345:12345"
     command: flask run --host 0.0.0.0 --port 12345 --no-reload
 
-  submit-worker:
+  celery:
     image: rmatics:local
     environment: *rmatics-env
-    command: python /code/rmatics/scripts/submit_workers.py --workers 1
-
-  notify-worker:
-    image: rmatics:local
-    environment: *rmatics-env
-    command: python /code/rmatics/scripts/notify_workers.py --workers 2
-
+    command: celery -A rmatics.scripts.celery_worker.celery worker --loglevel=info

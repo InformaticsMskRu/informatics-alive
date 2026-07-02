@@ -14,9 +14,8 @@ from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
 from rmatics.ejudge.submit_queue import (
-    queue_submit,
+    make_submit_task_chain,
 )
-from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
 
 from rmatics.model import CourseModule
 from rmatics.model.base import db
@@ -137,7 +136,9 @@ class TrustedSubmitApi(MethodView):
         # Коммит должен быть до отправки в очередь иначе это гонка
         db.session.commit()
 
-        queue_submit(run_id)
+        submit_task_chain = make_submit_task_chain()
+        submit_task_chain.delay(run.id)
+
         return jsonify({
             'run_id': run_id
         })

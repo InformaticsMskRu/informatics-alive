@@ -1,8 +1,17 @@
-from .queue import SubmitQueue
+import functools
 
+do_once = functools.lru_cache(1)
 
-submit_queue = SubmitQueue()
-queue_submit = submit_queue.submit
+@do_once
+def make_submit_task_chain():
+    """
+    Returns chain for sending celery task for non terminal statuses,
+    e.g. Compiling.
+    Cache for only once module importing
+    """
+    from .task import (
+        submit_task,
+    )
 
-
-get_last_get_id = submit_queue.get_last_get_id
+    submit_task_chain = submit_task.s()
+    return submit_task_chain

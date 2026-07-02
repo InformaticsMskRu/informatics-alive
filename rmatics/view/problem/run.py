@@ -9,7 +9,7 @@ from sqlalchemy import or_
 from typing import Optional
 
 from rmatics.ejudge.judges_config import get_judge
-from rmatics.ejudge.submit_queue import queue_submit
+from rmatics.ejudge.submit_queue import make_submit_task_chain
 from rmatics.model.base import db, mongo
 from rmatics.model.rejudge import Rejudge
 from rmatics.model.run import Run
@@ -89,7 +89,8 @@ class RunAPI(MethodView):
         db.session.add(run)
         db.session.commit()
 
-        queue_submit(run.id)
+        submit_task_chain = make_submit_task_chain()
+        submit_task_chain.delay(run.id)
 
         return jsonify({})
 
