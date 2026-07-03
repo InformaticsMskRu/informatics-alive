@@ -261,10 +261,10 @@ def upd_run(self, data) -> dict:
     rmatics_run_id = data.get('rmatics_run_id')
     if rmatics_run_id is not None:
         where = and_(Run.id == rmatics_run_id,
-                        Run.status.in_(NON_TERMINAL_STATUSES))
+                        Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
     else:
         where = and_(Run.ejudge_run_uuid == ejudge_run_uuid,
-                        Run.status.in_(NON_TERMINAL_STATUSES))
+                        Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
 
     applied = db.session.execute(update(Run).where(where).values(values)).rowcount
     db.session.commit()
@@ -283,7 +283,7 @@ def load_protocol(self, data):
     invalidate_monitor_cache_by_run(run)
 
     if _is_terminal(data["status"]):
-        url, token = _resolve_judge(data["judge_id"])
+        url, token = _resolve_judge(int(data["judge_id"]))
         try:
             protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], data["rmatics_run_id"])
             if protocol is not None:
