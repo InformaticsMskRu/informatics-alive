@@ -285,7 +285,7 @@ def load_protocol(self, data):
     if _is_terminal(data["status"]):
         url, token = _resolve_judge(int(data["judge_id"]))
         try:
-            protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], data["rmatics_run_id"])
+            protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], run.id)
             if protocol is not None:
                 run.protocol = protocol
         except Exception as exc:
