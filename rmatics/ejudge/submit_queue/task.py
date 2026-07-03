@@ -102,8 +102,8 @@ def _build_submit_error_protocol(run_id, ejudge_respone: str) -> dict:
         r["ejResp"] = ejudge_respone
     return r
 
-@shared_task(name='rmatics.ejudge.submit_queue.task.submit_task', ignore_result=True, retry=False)
-def submit_task(run_id):
+@shared_task(name='rmatics.ejudge.submit_queue.task.submit_task', ignore_result=True, bind=True, default_retry_delay=5, max_retries=3)
+def submit_task(self, run_id):
     logger.info(f'Trying to send run #{run_id} to ejudge')
 
     run = _get_run(run_id)
@@ -159,11 +159,20 @@ def submit_task(run_id):
             token=entry_token,
             ext_user_id=run_id
         )
-    except Exception:
-        logger.exception(
+    except Exception as e:
+        logger.error(
             f'Run #{run_id}: submit to judge {judge_id!r} raised exception'
         )
+        if self.request.retries < submit_task.max_retries:
+            logger.info('retry submit')
+            self.retry(exc=e)
+
+        _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, judge_id)
+        ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')
+        run.protocol = _build_submit_error_protocol(run_id, ejudge_compiler_output)
+        logger.error('submit failed after 3 retries')
         return
+
 
     try:
         code = ejudge_response['code']
@@ -176,5 +185,5 @@ def submit_task(run_id):
     except (TypeError, KeyError, ValueError):
         _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, judge_id)
         ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')
-        run.protocol = _build_submit_error_protocol(ejudge_compiler_output)
+        run.protocol = _build_submit_error_protocol(run_id, ejudge_compiler_output)
         logger.error(f'Ejudge returned error for submit #{run_id}')

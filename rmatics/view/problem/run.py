@@ -10,7 +10,7 @@ from marshmallow import fields, Schema, post_load
 from pymongo.errors import PyMongoError, DuplicateKeyError
 from webargs.flaskparser import parser
 from werkzeug.exceptions import NotFound, BadRequest, InternalServerError
-from sqlalchemy import or_
+from sqlalchemy import or_, and_, update
 from typing import Optional
 
 from rmatics.ejudge.judges_config import get_judge
@@ -201,53 +201,85 @@ def _get_run(data) -> Run:
                        judge_id=data["judge_id"]) \
                 .one_or_none()
     except:
-        msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}. Retry...'
+        msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}.'
         logger.exception(msg)
         raise BadRequest(msg)
     
     if run is None:
-        msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}. Retry...'
+        msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}.'
         logger.exception(msg)
         raise BadRequest(msg)
 
     return run
 
+def _to_int(value) -> Optional[int]:
+    return int(value) if value is not None else None
+
+@shared_task(name='rmatics.view.problem.run.check_run', bind=True, max_retries=None, retry_backoff=True)
+def check_run(self, data) -> dict:
+    ejudge_run_id = _to_int(data.get('run_id'))
+    ejudge_run_uuid = data.get('run_uuid')
+    ejudge_contest_id = _to_int(data.get('contest_id'))
+    status = _to_int(data.get('status'))
+    judge_id = _to_int(data.get('judge_id'))
+
+    if ejudge_run_id is None or ejudge_contest_id is None or ejudge_run_uuid is None or status is None or judge_id is None:
+        msg = f'Incorrect data: {data}'
+        raise BadRequest(msg)
+    
+    try:
+        _get_run(data)
+    except Exception as e:
+        logger.info('retry run')
+        self.retry(exc=e)
+
+    return data
 
 @shared_task(name='rmatics.view.problem.run.upd_run', bind=True, max_retries=None, retry_backoff=True)
 def upd_run(self, data) -> dict:
-    ejudge_run_uuid = data['run_uuid']
-    ejudge_run_id = int(data['run_id'])
-    ejudge_contest_id = int(data['contest_id'])
-    status = int(data['status'])
-    try:
-        judge_id = int(data['judge_id'])
-    except:
-        msg = f'Incorrect judge_id'
-        raise BadRequest(msg)
-    
-    run = _get_run(data)
+    ejudge_run_id = _to_int(data.get('run_id'))
+    ejudge_run_uuid = data.get('run_uuid')
+    ejudge_contest_id = _to_int(data.get('contest_id'))
+    status = _to_int(data.get('status'))
 
-    run_schema = FromEjudgeRunSchema(context={'instance': run})
-    received_run, errors = run_schema.load(data)
-    if errors:
-        logger.exception("Failed to load schema. Retry...")
-        self.retry(exc=BadRequest(errors), countdown=2 * self.request.retries)
+    values = {}
+    if status is not None:
+        values[Run.ejudge_status] = status
 
-    db.session.add(received_run)
-    db.session.commit()  
+    score = _to_int(data.get('score'))
+    if score is not None:
+        values[Run.ejudge_score] = score
 
-    return {
-        "judge_id": judge_id,
-        "contest_id": ejudge_contest_id,
-        "run_id": ejudge_run_id,
-        "run_uuid": ejudge_run_uuid,
-        "rmatics_run_id": int(run.id),
-        "status": status
-    }
+    test = _to_int(data.get('test_num'))
+    if test is not None:
+        values[Run.ejudge_test_num] = test
+
+    values[Run.ejudge_run_id] = ejudge_run_id
+    values[Run.ejudge_run_uuid] = ejudge_run_uuid
+    values[Run.ejudge_contest_id] = ejudge_contest_id
+
+    rmatics_run_id = data.get('rmatics_run_id')
+    if rmatics_run_id is not None:
+        where = and_(Run.id == rmatics_run_id,
+                        Run.status.in_(NON_TERMINAL_STATUSES))
+    else:
+        where = and_(Run.ejudge_run_uuid == ejudge_run_uuid,
+                        Run.status.in_(NON_TERMINAL_STATUSES))
+
+    applied = db.session.execute(update(Run).where(where).values(values)).rowcount
+    db.session.commit()
+
+    if applied > 0:
+        logger.info(f'Run was updated successfully')
+    else:
+        logger.info(f'Skipping update: already terminal')
+
+    return data
 
 @shared_task(name='rmatics.view.problem.run.load_protocol', bind=True, default_retry_delay=30, max_retries=5)
 def load_protocol(self, data):
     run = _get_run(data)
+
     invalidate_monitor_cache_by_run(run)
 
     if _is_terminal(data["status"]):
@@ -265,7 +297,7 @@ def load_protocol(self, data):
             raise exc
 
 def make_upd_chain():
-    upd_chain = upd_run.s() | load_protocol.s()
+    upd_chain = check_run.s() | upd_run.s() | load_protocol.s()
     return upd_chain
 
 class UpdateRunFromEjudgeAPI(MethodView):
@@ -274,6 +306,6 @@ class UpdateRunFromEjudgeAPI(MethodView):
         data = request.get_json(force=True)
 
         upd_chain = make_upd_chain()
-        result = upd_chain.delay(data)
+        upd_chain.delay(data)
 
         return jsonify({}, 200)
