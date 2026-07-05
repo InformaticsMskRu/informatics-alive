@@ -241,6 +241,7 @@ def upd_run(self, data) -> dict:
     ejudge_run_uuid = data.get('run_uuid')
     ejudge_contest_id = _to_int(data.get('contest_id'))
     status = _to_int(data.get('status'))
+    judge_id = _to_int(data.get('judge_id'))
 
     values = {}
     if status is not None:
@@ -264,6 +265,7 @@ def upd_run(self, data) -> dict:
                         Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
     else:
         where = and_(Run.ejudge_run_uuid == ejudge_run_uuid,
+                     Run.judge_id == judge_id,
                         Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
 
     applied = db.session.execute(update(Run).where(where).values(values)).rowcount

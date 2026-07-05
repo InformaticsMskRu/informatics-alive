@@ -168,8 +168,7 @@ def submit_task(self, run_id):
             self.retry(exc=e)
 
         _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, judge_id)
-        ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')
-        run.protocol = _build_submit_error_protocol(run_id, ejudge_compiler_output)
+        run.protocol = _build_submit_error_protocol(run_id, 'Ошибка отправки посылки')
         logger.error('submit failed after 3 retries')
         return
 
