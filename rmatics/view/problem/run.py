@@ -217,16 +217,6 @@ def _to_int(value) -> Optional[int]:
 
 @shared_task(name='rmatics.view.problem.run.check_run', bind=True, max_retries=None, retry_backoff=True)
 def check_run(self, data) -> dict:
-    ejudge_run_id = _to_int(data.get('run_id'))
-    ejudge_run_uuid = data.get('run_uuid')
-    ejudge_contest_id = _to_int(data.get('contest_id'))
-    status = _to_int(data.get('status'))
-    judge_id = _to_int(data.get('judge_id'))
-
-    if ejudge_run_id is None or ejudge_contest_id is None or ejudge_run_uuid is None or status is None or judge_id is None:
-        msg = f'Incorrect data: {data}'
-        raise BadRequest(msg)
-    
     try:
         _get_run(data)
     except Exception as e:
@@ -235,8 +225,30 @@ def check_run(self, data) -> dict:
 
     return data
 
-@shared_task(name='rmatics.view.problem.run.upd_run', bind=True, max_retries=None, retry_backoff=True)
-def upd_run(self, data) -> dict:
+@shared_task(name='rmatics.view.problem.run.load_protocol', bind=True, default_retry_delay=30, max_retries=5)
+def load_protocol(self, data) -> dict:
+    run = _get_run(data)
+
+    invalidate_monitor_cache_by_run(run)
+
+    if _is_terminal(data["status"]):
+        url, token = _resolve_judge(int(data["judge_id"]))
+        try:
+            protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], run.id)
+            if protocol is not None:
+                run.protocol = protocol
+        except Exception as exc:
+            if self.request.retries < load_protocol.max_retries:
+                logger.info('retry protocol')
+                self.retry(exc=exc)
+            logger.warning('Failed to load protocol Max retries count exceed. Aborting.'
+                          f'Request args={data}')
+            raise exc
+        
+    return data
+
+@shared_task(name='rmatics.view.problem.run.upd_run', ignore_result=True, retry=False)
+def upd_run(data):
     ejudge_run_id = _to_int(data.get('run_id'))
     ejudge_run_uuid = data.get('run_uuid')
     ejudge_contest_id = _to_int(data.get('contest_id'))
@@ -276,30 +288,12 @@ def upd_run(self, data) -> dict:
     else:
         logger.info(f'Skipping update: already terminal')
 
-    return data
+def make_terminal_upd_chain():
+    upd_chain = check_run.s() | load_protocol.s() | upd_run.s()
+    return upd_chain
 
-@shared_task(name='rmatics.view.problem.run.load_protocol', bind=True, default_retry_delay=30, max_retries=5)
-def load_protocol(self, data):
-    run = _get_run(data)
-
-    invalidate_monitor_cache_by_run(run)
-
-    if _is_terminal(data["status"]):
-        url, token = _resolve_judge(int(data["judge_id"]))
-        try:
-            protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], run.id)
-            if protocol is not None:
-                run.protocol = protocol
-        except Exception as exc:
-            if self.request.retries < load_protocol.max_retries:
-                logger.info('retry protocol')
-                self.retry(exc=exc)
-            logger.warning('Failed to load protocol Max retries count exceed. Aborting.'
-                          f'Request args={data}')
-            raise exc
-
-def make_upd_chain():
-    upd_chain = check_run.s() | upd_run.s() | load_protocol.s()
+def make_nonterminal_upd_chain():
+    upd_chain = check_run.s() | upd_run.s()
     return upd_chain
 
 class UpdateRunFromEjudgeAPI(MethodView):
@@ -307,7 +301,21 @@ class UpdateRunFromEjudgeAPI(MethodView):
     def post(self):
         data = request.get_json(force=True)
 
-        upd_chain = make_upd_chain()
+        ejudge_run_id = _to_int(data.get('run_id'))
+        ejudge_run_uuid = data.get('run_uuid')
+        ejudge_contest_id = _to_int(data.get('contest_id'))
+        status = _to_int(data.get('status'))
+        judge_id = _to_int(data.get('judge_id'))
+
+        if ejudge_run_id is None or ejudge_contest_id is None or ejudge_run_uuid is None or status is None or judge_id is None:
+            msg = f'Incorrect data: {data}'
+            raise BadRequest(msg)
+
+        if status in NON_TERMINAL_STATUSES:
+            upd_chain = make_nonterminal_upd_chain()
+        else:
+            upd_chain = make_terminal_upd_chain()
+            
         upd_chain.delay(data)
 
         return jsonify({}, 200)

@@ -27,42 +27,20 @@ def fetch_protocol(
         'format': 'xml',
     }
 
-    try:
-        resp = requests.get(
-            url,
-            params=params,
-            headers=headers,
-            timeout=10,
-        )
-        resp.raise_for_status()
-
-    except requests.RequestException:
-        current_app.logger.exception(
-            f'notify: cannot fetch report for '
-            f'ej_run {ej_run_id}/{ej_contest_id}'
-        )
-        return None
+    resp = requests.get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=10,
+    )
+    resp.raise_for_status()
 
     content_type = resp.headers.get('Content-Type', '')
 
     if 'xml' in content_type:
-        try:
-            return parse_xml_testing_report(resp.text, run_id)
-        except:
-            current_app.logger.exception(
-                f'notify: cannot parse testing-report for '
-                f'ej_run {ej_run_id}/{ej_contest_id}'
-            )
-            return None
+        return parse_xml_testing_report(resp.text, run_id)
     elif 'bson' in content_type:
-        try:
-            return parse_bson_testing_report(resp.content, run_id)
-        except:
-            current_app.logger.exception(
-                f'notify: cannot parse bson testing-report for '
-                f'ej_run {ej_run_id}/{ej_contest_id}'
-            )
-            return None
+        return parse_bson_testing_report(resp.content, run_id)
     else:
         # отчёт недоступен — статус уже обновили,
         # потесты пропускаем.
