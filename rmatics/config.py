@@ -78,7 +78,7 @@ class BaseConfig:
     task_ignore_result = bool_(os.getenv('CELERY_TASK_IGNORE_RESULT', False))
     imports = (
         'rmatics.ejudge.submit_queue.task',
-        'rmatics.view.problem.run'
+        'rmatics.tasks.notify'
     )
     worker_max_memory_per_child = 250_000  # 250MB
     broker_transport_options = {
