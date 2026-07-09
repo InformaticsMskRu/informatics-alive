@@ -1,3 +1,6 @@
+import base64
+import bz2
+
 import bson
 
 from rmatics.utils.run import get_string_status
@@ -8,13 +11,34 @@ def _to_int(value, default=None):
     except (TypeError, ValueError):
         return default
 
+def _to_text(value) -> str:
+    if value is None:
+        return ''
+    if isinstance(value, bytes):
+        return value.decode('utf-8', 'replace')
+    return value
+
 def _text(elem) -> str:
     if elem is None:
         return ''
     data = elem.get('data')
     if data is None:
         return ''
-    return data.decode("utf-8")
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    else:
+        data = bytes(data)
+    if elem.get('base64'):
+        try:
+            data = base64.b64decode(data)
+        except (ValueError, TypeError):
+            pass
+    if elem.get('bzip2'):
+        try:
+            data = bz2.decompress(data)
+        except (OSError, ValueError):
+            pass
+    return data.decode('utf-8', 'replace')
 
 
 def _too_big(elem) -> bool:
@@ -69,6 +93,6 @@ def parse_bson_testing_report(bts: bytes, run_id: int) -> dict:
 
     return {
         'run_id': run_id,
-        'compiler_output': b_output.decode("utf-8") if b_output is not None else None,
+        'compiler_output': _to_text(b_output) if b_output is not None else None,
         'tests': tests,
     }
