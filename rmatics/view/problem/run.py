@@ -89,7 +89,6 @@ class RunAPI(MethodView):
         run.ejudge_status = 377
         run.ejudge_test_num = None
         run.ejudge_score = None
-        run.ejudge_last_timestamp = 0
         db.session.add(run)
         db.session.commit()
 

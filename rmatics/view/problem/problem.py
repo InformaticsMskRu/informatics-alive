@@ -112,7 +112,6 @@ class TrustedSubmitApi(MethodView):
             problem_id=problem_id,
             statement_id=statement_id,
             ejudge_contest_id=problem.ejudge_contest_id,
-            ejudge_last_timestamp=0,
             lang_id=language_id,
             ejudge_status=377,  # In queue
             source_hash=source_hash,
