@@ -71,8 +71,6 @@ def check_run(self, data) -> dict:
 def load_protocol(self, data) -> dict:
     run = _get_run(data)
 
-    invalidate_monitor_cache_by_run(run)
-
     if _is_terminal(data["status"]):
         url, token = _resolve_judge(int(data["judge_id"]))
         try:
@@ -129,11 +127,22 @@ def upd_run(data):
         logger.info(f'Run was updated successfully')
     else:
         logger.info(f'Skipping update: already terminal')
+    return data
+
+@shared_task(name='rmatics.tasks.notify.invalidate_cache', bind=True, ignore_result=True, default_retry_delay=5, max_retries=3)
+def invalidate_cache(self, data):
+    try:
+        run = _get_run(data)
+    except Exception as e:
+        logger.info('retry invalidate')
+        self.retry(exc=e)
+
+    invalidate_monitor_cache_by_run(run)
 
 def make_terminal_upd_chain():
-    upd_chain = check_run.s() | load_protocol.s() | upd_run.s()
+    upd_chain = check_run.s() | load_protocol.s() | upd_run.s() | invalidate_cache.s()
     return upd_chain
 
 def make_nonterminal_upd_chain():
-    upd_chain = check_run.s() | upd_run.s()
+    upd_chain = check_run.s() | upd_run.s() | invalidate_cache.s()
     return upd_chain
