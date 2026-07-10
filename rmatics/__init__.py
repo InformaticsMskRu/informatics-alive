@@ -72,7 +72,7 @@ def init_logger():
 def configure_celery_app(app, celery):
     """Configures the celery app.
     """
-    celery.conf.update(app.config)
+    celery.conf.update(app.config.get('CELERY_CONFIG', {}))
     TaskBase = celery.Task
 
     class ContextTask(TaskBase):
