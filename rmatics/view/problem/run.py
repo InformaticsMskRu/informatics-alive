@@ -168,7 +168,52 @@ class ProtocolApi(MethodView):
 
         return jsonify(protocol)
 
-class UpdateRunFromEjudgeAPI(MethodView):
+class UpdateRunFromEjudgeAPIv1(MethodView):
+
+    def post(self):
+        data = request.get_json(force=True)
+        ejudge_run_id = data['run_id']
+        ejudge_contest_id = data['contest_id']
+        mongo_protocol_id = data.get('mongo_protocol_id', None)
+
+        run = db.session.query(Run) \
+            .filter_by(ejudge_run_id=ejudge_run_id,
+                       ejudge_contest_id=ejudge_contest_id) \
+            .one_or_none()
+
+        if run is None:
+            msg = f'Cannot find Run with  \
+                    ejudge_contest_id={ejudge_contest_id},  \
+                    ejudge_run_id={ejudge_run_id}'
+            raise BadRequest(msg)
+
+        run_schema = FromEjudgeRunSchema(context={'instance': run})
+        received_run, errors = run_schema.load(data)
+        if errors:
+            raise BadRequest(errors)
+
+        if mongo_protocol_id:
+            # If it is we should invalidate cache
+            invalidate_monitor_cache_by_run(run)
+            current_app.logger.debug('Cache invalidated')
+            try:
+                result = mongo.db.protocol.update_one({'_id': ObjectId(mongo_protocol_id)},
+                                                      {'$set': {'run_id': received_run.id}})
+                if not result.modified_count:
+                    raise BadRequest(f'Cannot find protocol by _id {mongo_protocol_id}')
+            except DuplicateKeyError:
+                current_app.logger.exception('Found duplicate key for run_id')
+
+            except PyMongoError:
+                current_app.logger.exception('Looks like mongo is shutdown')
+                raise InternalServerError(f'Looks like mongo is shutdown')
+
+        db.session.add(received_run)
+        db.session.commit()
+
+        return jsonify({}, 200)
+
+class UpdateRunFromEjudgeAPIv2(MethodView):
 
     def post(self):
         data = request.get_json(force=True)
