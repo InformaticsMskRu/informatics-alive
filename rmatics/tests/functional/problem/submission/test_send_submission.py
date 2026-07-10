@@ -35,6 +35,7 @@ class TestAPIProblemSubmission(TestCase):
         with mock.patch(
                 'rmatics.view.problem.problem.TrustedSubmitApi.check_file_restriction') as check_file_restriction, \
                 mock.patch('rmatics.view.problem.problem.Run.generate_source_hash') as generate_source_hash, \
+                mock.patch('rmatics.view.problem.problem.submit_task') as submit_task, \
                 mock.patch('rmatics.view.problem.problem.Run.update_source') as update_source:
             check_file_restriction.return_value = io.BytesIO(bytes((ascii('f') * 64 * 1024).encode('ascii')))
             generate_source_hash.return_value = self.SOURCE_HASH

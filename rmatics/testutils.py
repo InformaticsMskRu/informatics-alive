@@ -1,10 +1,17 @@
 import flask_testing
+import os
 import unittest
 import sys
 
+# Локальный запуск без docker-compose: TEST_INFRA=local подменяет
+# mysql/mongo/redis на sqlite/mongomock/fakeredis (см. rmatics/tests/lightweight.py)
+if os.getenv('TEST_INFRA') == 'local':
+    from rmatics.tests.lightweight import enable as _enable_lightweight_infra
+    _enable_lightweight_infra()
+
 from rmatics import create_app
 from rmatics.model import CourseModule, Run
-from rmatics.model.base import db, mongo, redis
+from rmatics.model.base import celery, db, mongo, redis
 from rmatics.model.group import (
     Group,
     UserGroup,
@@ -15,6 +22,28 @@ from rmatics.model.problem import (
 from rmatics.model.statement import Statement, StatementProblem
 from rmatics.model.user import SimpleUser
 
+# В тестах celery-задачи выполняются синхронно, без брокера и воркеров.
+# Настраиваем celery напрямую: через app.config эти ключи не доезжают
+# (from_object берёт только UPPERCASE-атрибуты конфига).
+celery.conf.task_always_eager = True
+celery.conf.task_eager_propagates = True
+
+# Приложение одно на весь прогон: configure_celery_app при каждом create_app
+# заново оборачивает celery.Task в ContextTask с новым app в замыкании,
+# из-за чего задачи выполнялись бы в контексте самого первого приложения
+# (не с теми judges/конфигом).
+_app = None
+
+
+def _get_test_app():
+    global _app
+    if _app is None:
+        _app = create_app(config='rmatics.config.TestConfig')
+        # Иначе при DEBUG=True упавший 500-кой запрос оставляет request
+        # context на стеке и роняет весь прогон ("Popped wrong request context")
+        _app.config['PRESERVE_CONTEXT_ON_EXCEPTION'] = False
+    return _app
+
 
 class TestCase(flask_testing.TestCase):
     CONFIG = {
@@ -23,10 +52,13 @@ class TestCase(flask_testing.TestCase):
     }
 
     def create_app(self):
-        app = create_app(config='rmatics.config.TestConfig')
-        return app
+        return _get_test_app()
 
     def setUp(self):
+        # app общий на все тесты — судейский конфиг сбрасываем явно
+        self.app.extensions['judges'] = {}
+        self.app.config['DEFAULT_JUDGE_ID'] = None
+
         db.drop_all()
         db.create_all()
 
@@ -143,6 +175,19 @@ class TestCase(flask_testing.TestCase):
         ]
         db.session.add_all(self.users)
         db.session.flush(self.users)
+
+    def create_judges(self):
+        """Конфигурация judges (judges.json) + DEFAULT_JUDGE_ID для тестов."""
+        from rmatics.ejudge.judges_config import JudgeConfig
+        self.judges = {
+            1: JudgeConfig(url='http://ejudge-1/cgi-bin/new-client',
+                           name='new-ejudge', token='token-1'),
+            2: JudgeConfig(url='http://ejudge-2/cgi-bin/new-client',
+                           name='second-ejudge', token='token-2',
+                           sender_user_id=7, lang_map={27: 62}),
+        }
+        self.app.extensions['judges'] = self.judges
+        self.app.config['DEFAULT_JUDGE_ID'] = 1
 
     def create_runs(self):
         self.runs = [
