@@ -55,7 +55,10 @@ def _get_run(data) -> Run:
     return run
 
 def _to_int(value) -> Optional[int]:
-    return int(value) if value is not None else None
+    try:
+        return int(value)
+    except:
+        return None
 
 @shared_task(name='rmatics.tasks.notify.check_run', bind=True, max_retries=None, retry_backoff=True)
 def check_run(self, data) -> dict:

@@ -133,6 +133,12 @@ def submit_task(self, run_id):
     if judge_id is None:
         judge_id = get_default_judge_id()
 
+    if judge_id is None:
+        logger.error(
+            'Neither judge_id nor DEFAULT_JUDGE_ID were not found'
+        )
+        return
+
     judge = get_judge(judge_id)
     if judge is None:
         logger.error(
@@ -183,6 +189,6 @@ def submit_task(self, run_id):
         logger.info(f'Run #{run_id} successfully updated')
     except (TypeError, KeyError, ValueError):
         _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, judge_id)
-        ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки')
+        ejudge_compiler_output = ejudge_response.get('message', 'Ошибка отправки посылки') if isinstance(ejudge_response, dict) else 'Ошибка отправки посылки'
         run.protocol = _build_submit_error_protocol(run_id, ejudge_compiler_output)
         logger.error(f'Ejudge returned error for submit #{run_id}')

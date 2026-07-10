@@ -135,8 +135,7 @@ class TrustedSubmitApi(MethodView):
         # Коммит должен быть до отправки в очередь иначе это гонка
         db.session.commit()
 
-        result = submit_task.delay(run.id)
-        print(result)
+        submit_task.delay(run.id)
 
         return jsonify({
             'run_id': run_id
