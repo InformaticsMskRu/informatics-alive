@@ -23,8 +23,9 @@ from rmatics.model.statement import Statement, StatementProblem
 from rmatics.model.user import SimpleUser
 
 # В тестах celery-задачи выполняются синхронно, без брокера и воркеров.
-# Настраиваем celery напрямую: через app.config эти ключи не доезжают
-# (from_object берёт только UPPERCASE-атрибуты конфига).
+# Настраиваем celery напрямую: CELERY_CONFIG из конфига приложения
+# применяется только внутри create_app, а eager-режим нужен независимо
+# от того, какое приложение создаётся.
 celery.conf.task_always_eager = True
 celery.conf.task_eager_propagates = True
 

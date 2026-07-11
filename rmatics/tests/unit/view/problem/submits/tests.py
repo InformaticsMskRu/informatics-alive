@@ -178,7 +178,7 @@ class TestUpdateSubmissionFromEjudge(TestCase):
 
     def send_request_to_update_run(self, **data):
         data = json.dumps(data)
-        url = url_for('problem.update_from_ejudge')
+        url = url_for('problem.update_from_ejudge_v2')
         resp = self.client.post(url, data=data)
         return resp
 
@@ -226,10 +226,6 @@ class TestUpdateSubmissionFromEjudge(TestCase):
         })
         self.assert400(resp)
 
-    # Известный баг (см. отчёт ревью, №13): _to_int в rmatics/tasks/notify.py
-    # не ловит ValueError, поэтому мусор в status роняет ручку 500-кой
-    # вместо 400. Когда починят — убрать декоратор.
-    @unittest.expectedFailure
     def test_non_integer_status_is_bad_request(self):
         resp = self.send_request_to_update_run(**{
             'run_id': self.run.ejudge_run_id,

@@ -1,5 +1,4 @@
 import datetime
-import unittest
 
 import mock
 
@@ -125,12 +124,6 @@ class TestSubmitTaskErrors(SubmitTaskTestCase):
                          EJUDGE_ERROR_RESPONSE['message'])
         self.assertEqual(protocol['run_id'], self.run.id)
 
-    # Известный баг (см. отчёт ревью, №7): при None от ejudge_proxy.submit
-    # внутри except-ветки вызывается ejudge_response.get(...) и задача падает
-    # AttributeError — посылка остаётся без протокола ошибки.
-    # Когда баг починят, тест начнёт проходить (unexpected success) —
-    # тогда нужно убрать декоратор.
-    @unittest.expectedFailure
     @mock.patch(SUBMIT_PATH)
     def test_none_response_sets_error_status(self, submit_mock):
         """ejudge_proxy.submit возвращает None (например, нет токена) —
@@ -178,6 +171,18 @@ class TestSubmitTaskErrors(SubmitTaskTestCase):
     def test_run_not_found_does_not_submit(self, submit_mock):
         submit_task.delay(999999)
         submit_mock.assert_not_called()
+
+    @mock.patch(SUBMIT_PATH)
+    def test_no_judge_and_no_default_does_not_submit(self, submit_mock):
+        """У задачи нет judges_settings, а DEFAULT_JUDGE_ID не настроен —
+        посылка не отправляется, задача не падает."""
+        self.app.config['DEFAULT_JUDGE_ID'] = None
+
+        submit_task.delay(self.run.id)
+
+        submit_mock.assert_not_called()
+        run = db.session.query(Run).get(self.run.id)
+        self.assertEqual(run.ejudge_status, EjudgeStatuses.IN_QUEUE.value)
 
     @mock.patch(SUBMIT_PATH)
     def test_unknown_judge_does_not_submit(self, submit_mock):
