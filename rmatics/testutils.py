@@ -1,3 +1,4 @@
+import flask
 import flask_testing
 import os
 import unittest
@@ -29,6 +30,16 @@ from rmatics.model.user import SimpleUser
 celery.conf.task_always_eager = True
 celery.conf.task_eager_propagates = True
 
+
+def _unwrap_context_task():
+    while celery.Task.__name__ == 'ContextTask':
+        celery.Task = celery.Task.__mro__[1]
+
+
+# При запуске через `flask test` CLI уже создал приложение из wsgi.py
+# и celery.Task уже обёрнут — снимаем сразу при импорте.
+_unwrap_context_task()
+
 # Приложение одно на весь прогон: configure_celery_app при каждом create_app
 # заново оборачивает celery.Task в ContextTask с новым app в замыкании,
 # из-за чего задачи выполнялись бы в контексте самого первого приложения
@@ -39,7 +50,11 @@ _app = None
 def _get_test_app():
     global _app
     if _app is None:
-        _app = create_app(config='rmatics.config.TestConfig')
+        if flask.has_app_context():
+            _app = flask.current_app._get_current_object()
+        else:
+            _app = create_app(config='rmatics.config.TestConfig')
+            _unwrap_context_task()
         # Иначе при DEBUG=True упавший 500-кой запрос оставляет request
         # context на стеке и роняет весь прогон ("Popped wrong request context")
         _app.config['PRESERVE_CONTEXT_ON_EXCEPTION'] = False
