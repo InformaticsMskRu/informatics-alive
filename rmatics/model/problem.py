@@ -2,6 +2,7 @@ import os
 import glob
 from zipfile import ZipFile
 
+from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.orm import relationship
 
 from rmatics.ejudge.serve_internal import EjudgeContestCfg
@@ -77,7 +78,7 @@ class EjudgeProblem(Problem):
 
     ejudge_prid = db.Column('id', db.Integer, primary_key=True) #global id in ejudge
     contest_id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=False)
-    ejudge_contest_id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=False)
+    ejudge_contest_id = db.Column(INTEGER(unsigned=True), primary_key=True, nullable=False, autoincrement=False)
     secondary_ejudge_contest_id = db.Column(db.Integer, nullable=True)
     problem_id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=False) #id in contest
     short_id = db.Column(db.Unicode(50))

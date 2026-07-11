@@ -2,6 +2,7 @@ import xml.dom.minidom
 import xml
 import zipfile
 from flask import g
+from sqlalchemy.dialects.mysql import INTEGER
 
 from rmatics.model.base import db
 from rmatics.utils.ejudge_archive import EjudgeArchiveReader
@@ -23,8 +24,8 @@ class EjudgeRun(db.Model):
     )
     __tablename__ = 'runs'
 
-    run_id = db.Column(db.Integer, primary_key=True)
-    contest_id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(INTEGER(unsigned=True), primary_key=True)
+    contest_id = db.Column(INTEGER(unsigned=True), primary_key=True)
     size = db.Column(db.Integer)
     create_time = db.Column(db.DateTime)
     create_nsec = db.Column(db.Integer)
