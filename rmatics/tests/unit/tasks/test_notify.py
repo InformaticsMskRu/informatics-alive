@@ -150,8 +150,11 @@ class TestCheckRun(NotifyTestCase):
         data = notify_data(self.run, status=0)
         data['rmatics_run_id'] = 777555
 
-        with self.assertRaises(Retry):
-            check_run.apply(args=(data,))
+        with mock.patch.object(check_run, 'retry',
+                               side_effect=Retry('retry')) as retry_mock:
+            with self.assertRaises(Retry):
+                check_run.apply(args=(data,))
+        retry_mock.assert_called_once()
 
 
 class TestLoadProtocol(NotifyTestCase):
@@ -187,8 +190,11 @@ class TestLoadProtocol(NotifyTestCase):
         fetch_mock.side_effect = ConnectionError('ejudge api down')
 
         data = notify_data(self.run, status=EjudgeStatuses.OK.value)
-        with self.assertRaises(Retry):
-            load_protocol.apply(args=(data,))
+        with mock.patch.object(load_protocol, 'retry',
+                               side_effect=Retry('retry')) as retry_mock:
+            with self.assertRaises(Retry):
+                load_protocol.apply(args=(data,))
+        retry_mock.assert_called_once()
 
 
 class TestInvalidateCache(NotifyTestCase):

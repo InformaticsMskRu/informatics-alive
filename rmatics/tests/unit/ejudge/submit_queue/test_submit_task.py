@@ -146,8 +146,11 @@ class TestSubmitTaskErrors(SubmitTaskTestCase):
 
         submit_mock.side_effect = ConnectionError('ejudge is down')
 
-        with self.assertRaises(Retry):
-            submit_task.apply(args=(self.run.id,))
+        with mock.patch.object(submit_task, 'retry',
+                               side_effect=Retry('retry')) as retry_mock:
+            with self.assertRaises(Retry):
+                submit_task.apply(args=(self.run.id,))
+        retry_mock.assert_called_once()
 
         run = db.session.query(Run).get(self.run.id)
         self.assertEqual(run.ejudge_status, EjudgeStatuses.IN_QUEUE.value)
