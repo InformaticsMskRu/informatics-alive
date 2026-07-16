@@ -102,7 +102,7 @@ def _build_submit_error_protocol(run_id, ejudge_respone: str) -> dict:
         r["ejResp"] = ejudge_respone
     return r
 
-@shared_task(name='rmatics.ejudge.submit_queue.task.submit_task', ignore_result=True, bind=True, default_retry_delay=5, max_retries=3)
+@shared_task(name='rmatics.ejudge.submit_queue.task.submit_task', ignore_result=True, bind=True, default_retry_delay=5, max_retries=5)
 def submit_task(self, run_id):
     logger.info(f'Trying to send run #{run_id} to ejudge')
 

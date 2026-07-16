@@ -1,3 +1,5 @@
+import requests
+
 from celery import shared_task
 from celery.utils.log import get_task_logger
 
@@ -13,6 +15,9 @@ from rmatics.utils.cacher.helpers import invalidate_monitor_cache_by_run
 from rmatics.ejudge.protocol import fetch_protocol
 
 from rmatics.utils.run import EjudgeStatuses
+
+class NoRunError(Exception):
+    pass
 
 logger = get_task_logger(__name__)
 
@@ -30,7 +35,14 @@ def _resolve_judge(judge_id: int):
     judge = get_judge(judge_id)
     return judge.url, judge.get_token()
 
+def _compare_values(x, y) -> bool:
+    try:
+        return x is None or y is None or x == y
+    except:
+        return False
+
 def _get_run(data) -> Run:
+    run: Run = None
     try:
         run_id = data.get('rmatics_run_id')
         if run_id is not None:
@@ -45,12 +57,16 @@ def _get_run(data) -> Run:
     except:
         msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}.'
         logger.exception(msg)
-        raise BadRequest(msg)
+        raise NoRunError(msg)
     
-    if run is None:
+    if run is None \
+        or not _compare_values(data.get("rmatics_run_id"), run.id)    \
+        or not _compare_values(data["judge_id"], run.judge_id)        \
+        or not _compare_values(data["run_uuid"], run.ejudge_run_uuid):
+
         msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}.'
         logger.exception(msg)
-        raise BadRequest(msg)
+        raise NoRunError(msg)
 
     return run
 
@@ -60,13 +76,14 @@ def _to_int(value) -> Optional[int]:
     except:
         return None
 
-@shared_task(name='rmatics.tasks.notify.check_run', bind=True, max_retries=None, retry_backoff=True)
+CHECK_RUN_COUNTDOWNS = (2, 5, 15, 60, 120)
+@shared_task(name='rmatics.tasks.notify.check_run', bind=True, max_retries=len(CHECK_RUN_COUNTDOWNS))
 def check_run(self, data) -> dict:
     try:
         _get_run(data)
-    except Exception as e:
+    except NoRunError as e:
         logger.info('retry run')
-        self.retry(exc=e)
+        self.retry(exc=e, countdown=CHECK_RUN_COUNTDOWNS[self.request.retries])
 
     return data
 
@@ -80,18 +97,20 @@ def load_protocol(self, data) -> dict:
             protocol = fetch_protocol(url, token, data["contest_id"], data["run_id"], run.id)
             if protocol is not None:
                 run.protocol = protocol
-        except Exception as exc:
-            if self.request.retries < load_protocol.max_retries:
+        except requests.HTTPError as exc:
+            status = exc.response.status_code
+            if not (400 <= status < 500) and self.request.retries < load_protocol.max_retries:
                 logger.info('retry protocol')
                 self.retry(exc=exc)
-            logger.warning('Failed to load protocol Max retries count exceed. Aborting.'
+            logger.warning('Failed to load protocol. Aborting.'
                           f'Request args={data}')
             raise exc
         
     return data
 
-@shared_task(name='rmatics.tasks.notify.upd_run', ignore_result=True, retry=False)
-def upd_run(data):
+UPD_RUN_COUNTDOWNS = (2, 5, 15, 60, 120)
+@shared_task(name='rmatics.tasks.notify.upd_run', bind=True, ignore_result=True, max_retries=len(UPD_RUN_COUNTDOWNS))
+def upd_run(self, data):
     ejudge_run_id = _to_int(data.get('run_id'))
     ejudge_run_uuid = data.get('run_uuid')
     ejudge_contest_id = _to_int(data.get('contest_id'))
@@ -116,15 +135,23 @@ def upd_run(data):
 
     rmatics_run_id = data.get('rmatics_run_id')
     if rmatics_run_id is not None:
-        where = and_(Run.id == rmatics_run_id,
-                        Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
+        where = and_(Run.id == rmatics_run_id)
     else:
         where = and_(Run.ejudge_run_uuid == ejudge_run_uuid,
-                     Run.judge_id == judge_id,
-                        Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
+                     Run.judge_id == judge_id)
+        
+    if status in NON_TERMINAL_STATUSES:
+        where = and_(where, Run.ejudge_status.in_(NON_TERMINAL_STATUSES))
 
-    applied = db.session.execute(update(Run).where(where).values(values)).rowcount
-    db.session.commit()
+    try:
+        applied = db.session.execute(update(Run).where(where).values(values)).rowcount
+        db.session.commit()
+    except Exception as exc:
+        if self.request.retries < upd_run.max_retries:
+            logger.info('retry protocol')
+            self.retry(exc=exc, countdown=UPD_RUN_COUNTDOWNS[self.request.retries])
+        logger.error(f'Failed to update run. Aborting.')
+        raise exc
 
     if applied > 0:
         logger.info(f'Run was updated successfully')

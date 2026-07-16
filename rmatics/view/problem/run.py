@@ -23,8 +23,6 @@ from rmatics.utils.cacher.helpers import invalidate_monitor_cache_by_run
 from rmatics.utils.response import jsonify
 from rmatics.view.problem.serializers.run import RunSchema
 
-do_once = functools.lru_cache(1)
-
 POSSIBLE_SOURCE_ENCODINGS = ['utf-8', 'cp1251', 'windows-1251', 'ascii', 'koi8-r']
 
 
