@@ -105,6 +105,13 @@ def load_protocol(self, data) -> dict:
             logger.warning('Failed to load protocol. Aborting.'
                           f'Request args={data}')
             raise exc
+        except Exception as exc:
+            if self.request.retries < load_protocol.max_retries:
+                logger.info('retry protocol')
+                self.retry(exc=exc)
+            logger.warning('Failed to load protocol. Aborting.'
+                          f'Request args={data}')
+            raise exc
         
     return data
 

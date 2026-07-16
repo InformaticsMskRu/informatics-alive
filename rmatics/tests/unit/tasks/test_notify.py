@@ -12,6 +12,7 @@ from rmatics.tasks.notify import (
     make_nonterminal_upd_chain,
     make_terminal_upd_chain,
     upd_run,
+    NoRunError,
 )
 from rmatics.testutils import TestCase
 from rmatics.utils.run import EjudgeStatuses
@@ -68,14 +69,14 @@ class TestGetRun(NotifyTestCase):
     def test_missing_run_raises(self):
         data = notify_data(self.run, status=0)
         data['rmatics_run_id'] = 777555
-        with self.assertRaises(BadRequest):
+        with self.assertRaises(NoRunError):
             _get_run(data)
 
     def test_missing_run_by_uuid_raises(self):
         data = notify_data(self.run, status=0)
         data['rmatics_run_id'] = None
         data['run_uuid'] = 'no-such-uuid'
-        with self.assertRaises(BadRequest):
+        with self.assertRaises(NoRunError):
             _get_run(data)
 
 
