@@ -82,8 +82,11 @@ def check_run(self, data) -> dict:
     try:
         _get_run(data)
     except NoRunError as e:
-        logger.info('retry run')
-        self.retry(exc=e, countdown=CHECK_RUN_COUNTDOWNS[self.request.retries])
+        if self.request.retries < self.max_retries:
+            logger.info('retry run')
+            self.retry(exc=e, countdown=CHECK_RUN_COUNTDOWNS[self.request.retries])
+        logger.error('Failed to get run. Aborting.')
+        raise e
 
     return data
 
