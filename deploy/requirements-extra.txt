@@ -1,0 +1,6 @@
+marshmallow==2.19.5
+webargs==5.5.3
+python-dateutil==2.8.2
+cent==3.0.0
+dataclasses==0.8
+celery[redis]==4.2.1

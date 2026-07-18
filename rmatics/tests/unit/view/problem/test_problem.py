@@ -17,8 +17,8 @@ class TestProblem(TestCase):
         resp = self.send_request(self.ejudge_problems[0].id)
 
         self.assert200(resp)
-        self.assertIn('result', resp.json)
-        self.assertEqual('success', resp.json['result'])
+        self.assertIn('status', resp.json)
+        self.assertEqual('success', resp.json['status'])
         self.assertIn('data', resp.json)
 
         expected_keys = [

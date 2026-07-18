@@ -62,13 +62,33 @@ class BaseConfig:
     REDIS_URL = os.getenv('REDIS_URL', 'redis://@localhost:6379/0')
 
     # services
-    EJUDGE_NEW_CLIENT_URL = os.getenv('EJUDGE_NEW_CLIENT_URL', 'http://localhost/cgi-bin/new-client')
-    EJUDGE_MASTER_TOKEN = os.getenv('EJUDGE_MASTER_TOKEN', 'token')
     JUDGES_CONFIG_PATH = os.getenv('JUDGES_CONFIG_PATH', None)
     DEFAULT_JUDGE_ID = os.getenv('DEFAULT_JUDGE_ID', None)
 
+
+    # notification
+    EJUDGE_NOTIFY_GROUP = os.getenv('EJUDGE_NOTIFY_GROUP', 'rmatics')
+
     CENTRIFUGO_URL = os.getenv('CENTRIFUGO_URL', 'http://localhost:1377')
     CENTRIFUGO_API_KEY = os.getenv('CENTRIFUGO_API_KEY', 'foo')
+
+    # celery
+    CELERY_CONFIG = {
+        "broker_url": os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
+        "result_backend": os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
+        "task_ignore_result": bool_(os.getenv('CELERY_TASK_IGNORE_RESULT', False)),
+        "imports": (
+            'rmatics.ejudge.submit_queue.task',
+            'rmatics.tasks.notify'
+        ),
+        "worker_max_memory_per_child": 250_000,  # 250MB
+        "broker_transport_options": {
+            'fanout_prefix': True,
+            'fanout_patterns': True,
+            'visibility_timeout': 24 * 60 * 60,  # 24 hours
+        },
+        "worker_hijack_root_logger": False
+    }
 
 
 class DevConfig(BaseConfig):

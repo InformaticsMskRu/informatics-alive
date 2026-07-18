@@ -5,6 +5,7 @@ from rmatics.model.base import db
 from rmatics.model.ejudge_run import EjudgeRun
 from rmatics.model.user import User
 
+from sqlalchemy.dialects.mysql import INTEGER
 
 LANG = {
     1: 'Pascal',
@@ -72,8 +73,8 @@ class Ideal(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     problem_id = db.Column(db.Integer, db.ForeignKey('moodle.mdl_problems.id'))
-    run_id = db.Column(db.Integer, db.ForeignKey('ejudge.runs.run_id'))
-    contest_id = db.Column(db.Integer, db.ForeignKey('ejudge.runs.contest_id'))
+    run_id = db.Column(INTEGER(unsigned=True), db.ForeignKey('ejudge.runs.run_id'))
+    contest_id = db.Column(INTEGER(unsigned=True), db.ForeignKey('ejudge.runs.contest_id'))
     lang_id = db.Column(db.Integer)
     lang = db.Column(db.Unicode(100))
     code = db.Column(db.UnicodeText)

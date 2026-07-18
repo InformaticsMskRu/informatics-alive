@@ -1,6 +1,6 @@
 from unittest import mock
 
-from rmatics.ejudge.submit_queue.submit import _get_judge_entry
+from rmatics.ejudge.submit_queue.task import _get_judge_entry
 from rmatics.testutils import TestCase
 
 

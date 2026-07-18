@@ -1,6 +1,6 @@
 import datetime
+
 import base64
-from dateutil.tz import UTC
 from flask import (
     current_app,
     request,
@@ -13,9 +13,10 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
-from rmatics.ejudge.submit_queue import (
-    queue_submit,
+from rmatics.ejudge.submit_queue.task import (
+    submit_task,
 )
+
 from rmatics.model import CourseModule
 from rmatics.model.base import db
 from rmatics.model.group import UserGroup
@@ -28,7 +29,6 @@ from rmatics.view.problem.serializers.problem import ProblemSchema
 from rmatics.view.problem.serializers.run import RunSchema
 
 DEFAULT_MOODLE_CONTEXT_SOURCE = 10
-
 
 class TrustedSubmitApi(MethodView):
     post_args = {
@@ -131,12 +131,12 @@ class TrustedSubmitApi(MethodView):
         run.update_source(text)
 
         run_id = run.id
-        ejudge_url = current_app.config['EJUDGE_NEW_CLIENT_URL']
 
         # Коммит должен быть до отправки в очередь иначе это гонка
         db.session.commit()
 
-        queue_submit(run_id, ejudge_url)
+        submit_task.delay(run.id)
+
         return jsonify({
             'run_id': run_id
         })

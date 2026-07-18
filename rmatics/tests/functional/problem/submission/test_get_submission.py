@@ -70,7 +70,9 @@ class TestAPIProblemSubmission(TestCase):
             **kwargs
         }
 
-        response = self.client.get(route, data=data)
+        # часть аргументов view читает из query string (request.args),
+        # поэтому передаём всё именно там
+        response = self.client.get(route, query_string=data)
         return response
 
     def test_simple(self):

@@ -46,6 +46,7 @@ class Run(db.Model):
     ejudge_run_id = db.Column('ej_run_id', db.Integer)
     ejudge_contest_id = db.Column('ej_contest_id', db.Integer)
     ejudge_run_uuid = db.Column('ej_run_uuid', db.String(40))
+    judge_id = db.Column(db.SmallInteger, nullable=True)
 
     ejudge_score = db.Column('ej_score', db.Integer)
     ejudge_status = db.Column('ej_status', db.Integer)
@@ -55,7 +56,6 @@ class Run(db.Model):
     ejudge_create_time = db.Column('ej_create_time', db.DateTime)
     ejudge_last_change_time = db.Column('ej_last_change_time', db.DateTime)
     ejudge_url = db.Column(db.String(50))
-    judge_id = db.Column(db.SmallInteger, nullable=True)
 
     source_hash = db.Column(db.String(32))  # We are using md5 hex digest
 

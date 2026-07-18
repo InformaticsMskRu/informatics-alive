@@ -26,7 +26,6 @@ class RedisQueue:
     def get_blocking(self, timeout=0, pipe=None):
         if pipe is None:
             pipe = redis
-
         value = pipe.blpop(self.key, timeout=timeout)
         if value:
             value = pickle.loads(value[1])

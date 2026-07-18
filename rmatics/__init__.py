@@ -5,7 +5,7 @@ from werkzeug.exceptions import HTTPException
 
 from rmatics import cli
 from rmatics.ejudge.judges_config import init_app as init_judges
-from rmatics.model.base import db
+from rmatics.model.base import db, celery
 from rmatics.model.base import mongo
 from rmatics.model.base import redis
 from rmatics.plugins import monitor_cacher, invalidator
@@ -28,6 +28,7 @@ def create_app(config=None, config_logger=True):
 
     db.init_app(app)
     mongo.init_app(app)
+    configure_celery_app(app, celery)
     redis.init_app(app)
     init_judges(app)
 
@@ -67,6 +68,22 @@ def init_logger():
             'handlers': ['stdout']
         }
     })
+
+def configure_celery_app(app, celery):
+    """Configures the celery app.
+    """
+    celery.conf.update(app.config.get('CELERY_CONFIG', {}))
+    TaskBase = celery.Task
+
+    class ContextTask(TaskBase):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                try:
+                    return TaskBase.__call__(self, *args, **kwargs)
+                finally:
+                    db.session.rollback()
+
+    celery.Task = ContextTask
 
 
 if __name__ == "__main__":

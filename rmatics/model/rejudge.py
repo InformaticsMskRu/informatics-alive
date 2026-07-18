@@ -8,4 +8,3 @@ class Rejudge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     run_id = db.Column(db.Integer, db.ForeignKey('pynformatics.runs.id'), nullable=False)
     ejudge_contest_id = db.Column(db.Integer, nullable=False)
-    ejudge_url = db.Column(db.String(50))

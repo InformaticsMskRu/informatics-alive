@@ -1,0 +1,34 @@
+x-rmatics-env: &rmatics-env
+  FLASK_ENV: development
+  PYTHONPATH: /code
+  FLASK_APP: wsgi:application
+  SECRET_KEY: ${SECRET_KEY}
+  URL_ENCODER_ALPHABET: abcdefg
+  SQLALCHEMY_DATABASE_URI: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/pynformatics
+  MONGO_URI: mongodb://${MONGO_HOST}:${MONGO_PORT}/pynformatics
+  REDIS_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
+  CELERY_BROKER_URL: redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
+
+  JUDGES_CONFIG_PATH: /code/deploy/judges.json
+  DEFAULT_JUDGE_ID: ${DEFAULT_JUDGE_ID}
+  # Notification
+  EJUDGE_NOTIFY_GROUP: rmatics
+  # Centrifugo is optional for testing; failures are swallowed:
+  CENTRIFUGO_URL: http://localhost:1377
+  CENTRIFUGO_API_KEY: foo
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: rmatics:local
+    environment: *rmatics-env
+    ports:
+      - "12345:12345"
+    command: flask run --host 0.0.0.0 --port 12345 --no-reload
+
+  celery:
+    image: rmatics:local
+    environment: *rmatics-env
+    command: celery -A rmatics.scripts.celery_worker.celery worker --loglevel=info

@@ -1,3 +1,5 @@
+import functools
+
 from bson import ObjectId
 from flask import request, current_app
 from flask.views import MethodView
@@ -5,17 +7,21 @@ from marshmallow import fields, Schema, post_load
 from pymongo.errors import PyMongoError, DuplicateKeyError
 from webargs.flaskparser import parser
 from werkzeug.exceptions import NotFound, BadRequest, InternalServerError
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
-from rmatics.ejudge.judges_config import get_judge
-from rmatics.ejudge.submit_queue import queue_submit
+from rmatics.ejudge.submit_queue.task import submit_task
 from rmatics.model.base import db, mongo
 from rmatics.model.rejudge import Rejudge
 from rmatics.model.run import Run
+from rmatics.tasks.notify import (
+    NON_TERMINAL_STATUSES,
+    _to_int,
+    make_nonterminal_upd_chain,
+    make_terminal_upd_chain,
+)
 from rmatics.utils.cacher.helpers import invalidate_monitor_cache_by_run
 from rmatics.utils.response import jsonify
 from rmatics.view.problem.serializers.run import RunSchema
-
 
 POSSIBLE_SOURCE_ENCODINGS = ['utf-8', 'cp1251', 'windows-1251', 'ascii', 'koi8-r']
 
@@ -67,35 +73,24 @@ class RunAPI(MethodView):
 
     def post(self, run_id: int):
         """ View for rejudge run"""
-        run = db.session.query(Run).get(run_id)
+        run: Run = db.session.query(Run).get(run_id)
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')
 
-        # Resolve target ejudge URL: named judge > legacy ejudge_url column > system default
-        judge = get_judge(run.judge_id) if run.judge_id else None
-        ejudge_url = (judge.url if judge else None) \
-            or run.ejudge_url \
-            or current_app.config['EJUDGE_NEW_CLIENT_URL']
+        rejudge = Rejudge(run_id=run.id,
+                          ejudge_contest_id=run.ejudge_contest_id)
+        db.session.add(rejudge)
+        db.session.flush([rejudge])
 
-        # A run was never processed when no judge was recorded (judge_id for new runs,
-        # ejudge_url for old runs). In that case skip creating a rejudge archive record.
-        never_processed = run.judge_id is None and run.ejudge_url is None
-        if not never_processed:
-            rejudge = Rejudge(run_id=run.id,
-                              ejudge_contest_id=run.ejudge_contest_id,
-                              ejudge_url=ejudge_url)
-            db.session.add(rejudge)
-            db.session.flush([rejudge])
-
-            run.move_protocol_to_rejudge_collection(rejudge.id)
-
-        queue_submit(run.id, ejudge_url)
+        run.move_protocol_to_rejudge_collection(rejudge.id)
 
         run.ejudge_status = 377
         run.ejudge_test_num = None
         run.ejudge_score = None
         db.session.add(run)
         db.session.commit()
+
+        submit_task.delay(run.id)
 
         return jsonify({})
 
@@ -171,8 +166,7 @@ class ProtocolApi(MethodView):
 
         return jsonify(protocol)
 
-
-class UpdateRunFromEjudgeAPI(MethodView):
+class UpdateRunFromEjudgeAPIv1(MethodView):
 
     def post(self):
         data = request.get_json(force=True)
@@ -214,5 +208,29 @@ class UpdateRunFromEjudgeAPI(MethodView):
 
         db.session.add(received_run)
         db.session.commit()
+
+        return jsonify({}, 200)
+
+class UpdateRunFromEjudgeAPIv2(MethodView):
+
+    def post(self):
+        data = request.get_json(force=True)
+
+        ejudge_run_id = _to_int(data.get('run_id'))
+        ejudge_run_uuid = data.get('run_uuid')
+        ejudge_contest_id = _to_int(data.get('contest_id'))
+        status = _to_int(data.get('status'))
+        judge_id = _to_int(data.get('judge_id'))
+
+        if ejudge_run_id is None or ejudge_contest_id is None or ejudge_run_uuid is None or status is None or judge_id is None:
+            msg = f'Incorrect data: {data}'
+            raise BadRequest(msg)
+
+        if status in NON_TERMINAL_STATUSES:
+            upd_chain = make_nonterminal_upd_chain()
+        else:
+            upd_chain = make_terminal_upd_chain()
+            
+        upd_chain.delay(data)
 
         return jsonify({}, 200)

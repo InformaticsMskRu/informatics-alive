@@ -1,0 +1,9 @@
+{
+  "1": {
+    "name": "local-ejudge",
+    "url": "http://localhost/cgi-bin/new-master",
+    "token": "your token here...",
+    "sender_user_id": 1,
+    "lang_map": {},
+  }
+}
