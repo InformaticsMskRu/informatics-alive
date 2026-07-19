@@ -1,7 +1,6 @@
 import datetime
 import io
 import json
-import unittest
 from io import BytesIO
 from unittest.mock import patch, MagicMock
 
@@ -298,10 +297,6 @@ class TestGetRunProtocol(TestCase):
         self.assert200(resp)
         self.assertEqual(resp.json['data'], source)
 
-    # Известный баг (см. отчёт ревью, №4): unmarshal_protocol(None) падает
-    # TypeError, поэтому при отсутствии протокола вместо 404 — 500.
-    # Когда починят — убрать декоратор.
-    @unittest.expectedFailure
     def test_super_permissions_and_protocol_doesnt_exist(self):
         self.insert_protocol_to_mongo(self.run2.id)
         data = {'is_admin': True}
@@ -317,8 +312,6 @@ class TestGetRunProtocol(TestCase):
         self.assert200(resp)
         self.assertEqual(resp.json['data'], source)
 
-    # Тот же баг №4, что и выше: протокола нет -> TypeError вместо 404.
-    @unittest.expectedFailure
     def test_student_doesnt_have_own_protocol(self):
         data = {'is_admin': False, 'user_id': self.run1.user_id}
 
