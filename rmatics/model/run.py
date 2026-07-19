@@ -26,6 +26,7 @@ EJUDGE_COLUMNS = [
 
 class Run(db.Model):
     __table_args__ = (
+        db.Index('ix_runs_ej_run_uuid_judge_id', 'ej_run_uuid', 'judge_id'),
         {'schema': 'pynformatics'},
     )
     __tablename__ = 'runs'
