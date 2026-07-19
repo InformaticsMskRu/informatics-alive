@@ -180,6 +180,8 @@ LightWeightRun = Table(
 
 
 def unmarshal_protocol(p) -> Optional[dict]:
+    if p is None:
+        return None
     if "t" in p:
         p["tests"] = {test_number: {
             "input": fill(t, "i", str),
