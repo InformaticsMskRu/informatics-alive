@@ -79,6 +79,21 @@ class TestGetRun(NotifyTestCase):
         with self.assertRaises(NoRunError):
             _get_run(data)
 
+    def test_string_typed_ids_still_match(self):
+        """Новый ejudge шлёт judge_id / rmatics_run_id строками:
+        валидация в _get_run должна приводить их к int, а не падать."""
+        data = notify_data(self.run, status=0)
+        data['rmatics_run_id'] = str(self.run.id)
+        data['judge_id'] = str(self.run.judge_id)
+        self.assertEqual(_get_run(data).id, self.run.id)
+
+    def test_string_typed_judge_id_lookup_by_uuid(self):
+        """То же, но по ветке (run_uuid, judge_id) — без rmatics_run_id."""
+        data = notify_data(self.run, status=0)
+        data['rmatics_run_id'] = None
+        data['judge_id'] = str(self.run.judge_id)
+        self.assertEqual(_get_run(data).id, self.run.id)
+
 
 class TestUpdRun(NotifyTestCase):
     def test_updates_nonterminal_run(self):
