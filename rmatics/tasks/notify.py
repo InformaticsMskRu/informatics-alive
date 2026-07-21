@@ -60,8 +60,8 @@ def _get_run(data) -> Run:
         raise NoRunError(msg)
     
     if run is None \
-        or not _compare_values(data.get("rmatics_run_id"), run.id)    \
-        or not _compare_values(data["judge_id"], run.judge_id)        \
+        or not _compare_values(_to_int(data.get("rmatics_run_id")), run.id)    \
+        or not _compare_values(_to_int(data["judge_id"]), run.judge_id)        \
         or not _compare_values(data["run_uuid"], run.ejudge_run_uuid):
 
         msg = f'Cannot find Run with run_id={data.get("rmatics_run_id")}, judge_id={data["judge_id"]}, ejudge_run_uuid={data["run_uuid"]}.'
