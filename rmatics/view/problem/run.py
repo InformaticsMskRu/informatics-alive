@@ -226,6 +226,15 @@ class UpdateRunFromEjudgeAPIv2(MethodView):
             msg = f'Incorrect data: {data}'
             raise BadRequest(msg)
 
+        # Normalize numeric fields once so every downstream task gets ints
+        # instead of the raw JSON strings the ejudge notification may send.
+        data['run_id'] = ejudge_run_id
+        data['contest_id'] = ejudge_contest_id
+        data['status'] = status
+        data['judge_id'] = judge_id
+        if data.get('rmatics_run_id') is not None:
+            data['rmatics_run_id'] = _to_int(data.get('rmatics_run_id'))
+
         if status in NON_TERMINAL_STATUSES:
             upd_chain = make_nonterminal_upd_chain()
         else:
