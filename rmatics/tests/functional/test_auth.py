@@ -100,9 +100,12 @@ class TestJudgeTokenAuth(TestCase):
         self.assert403(self.send_notification(headers=self.judge_headers(1),
                                               judge_id=777))
 
-    def test_v1_without_judge_id_accepts_any_judge_token(self):
-        """Старый listener может не прислать judge_id — тогда подходит
-        токен любого судьи из judges.json."""
+    def test_without_judge_id_is_forbidden(self):
+        """judge_id обязателен: без него токен не с чем сверять."""
+        self.assert403(self.send_notification(headers=self.judge_headers(1),
+                                              judge_id=None))
+
+    def test_v1_requires_judge_id_too(self):
         url = url_for('problem.update_from_ejudge')
         data = {
             'run_id': 10,
@@ -110,6 +113,6 @@ class TestJudgeTokenAuth(TestCase):
             'status': EjudgeStatuses.OK.value,
         }
         self.assert403(self.client.post(url, json=data,
-                                        headers={'Authorization': 'Bearer nope'}))
-        self.assert200(self.client.post(url, json=data,
-                                        headers=self.judge_headers(2)))
+                                        headers=self.judge_headers(1)))
+        self.assert200(self.client.post(url, json={**data, 'judge_id': 1},
+                                        headers=self.judge_headers(1)))

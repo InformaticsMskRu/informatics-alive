@@ -44,8 +44,7 @@ def require_trusted_token(view):
 
 def require_judge_token(view):
     """
-    Старый listener может judge_id не прислать, тогда принимаем токен
-    любого известного judge.
+    judge_id в теле нотификации обязателен: без него токен не с чем сверять.
     """
     @functools.wraps(view)
     def wrapper(*args, **kwargs):
@@ -57,17 +56,12 @@ def require_judge_token(view):
         except (TypeError, ValueError):
             judge_id = None
 
-        if judge_id is not None:
-            judge = get_judge(judge_id)
-            matched = judge is not None and _matches(token, judge.get_token())
-        else:
-            current_app.logger.warning(
-                'Notification without judge_id, checking token against all judges'
-            )
-            matched = any(_matches(token, judge.get_token())
-                          for judge in current_app.extensions.get('judges', {}).values())
+        if judge_id is None:
+            current_app.logger.error('Notification without judge_id')
+            raise Forbidden('judge_id is required')
 
-        if not matched:
+        judge = get_judge(judge_id)
+        if judge is None or not _matches(token, judge.get_token()):
             raise Forbidden('Invalid token')
         return view(*args, **kwargs)
     return wrapper
