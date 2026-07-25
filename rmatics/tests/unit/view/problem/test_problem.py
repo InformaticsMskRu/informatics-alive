@@ -10,7 +10,7 @@ class TestProblem(TestCase):
 
     def send_request(self, problem_id, **kwargs):
         url = url_for('problem.problem', problem_id=problem_id)
-        response = self.client.get(url, **kwargs)
+        response = self.client.get(url, headers=self.trusted_headers, **kwargs)
         return response
 
     def test_simple(self):

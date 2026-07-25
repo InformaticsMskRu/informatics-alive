@@ -24,7 +24,7 @@ class TestAPIUpdateRun(TestCase):
 
     def send_request(self, run_id, data: dict):
         url = url_for('problem.run', run_id=run_id)
-        resp = self.client.put(url, json=data)
+        resp = self.client.put(url, json=data, headers=self.trusted_headers)
         return resp
 
     def test_put_not_found_run(self):
@@ -55,7 +55,7 @@ class TestRejudgeAPI(TestCase):
 
     def send_request(self, run_id):
         url = url_for('problem.rejudge_run', run_id=run_id)
-        resp = self.client.post(url)
+        resp = self.client.post(url, headers=self.trusted_headers)
         return resp
 
     @mock.patch('rmatics.view.problem.run.submit_task')
@@ -158,7 +158,7 @@ class TestUpdateFromEjudgeE2E(TestCase):
         }
         data.update(kwargs)
         url = url_for('problem.update_from_ejudge_v2')
-        return self.client.post(url, json=data)
+        return self.client.post(url, json=data, headers=self.judge_headers(1))
 
     @mock.patch('rmatics.tasks.notify.fetch_protocol')
     def test_terminal_notification_updates_run_and_protocol(self, fetch_mock):
@@ -201,7 +201,8 @@ class TestUpdateFromEjudgeE2E(TestCase):
 
     def test_incomplete_notification_is_bad_request(self):
         url = url_for('problem.update_from_ejudge_v2')
-        resp = self.client.post(url, json={'run_id': 10, 'status': 0})
+        resp = self.client.post(url, json={'run_id': 10, 'status': 0, 'judge_id': 1},
+                                headers=self.judge_headers(1))
         self.assert400(resp)
 
 
@@ -215,6 +216,7 @@ class TestUpdateFromEjudgeV1(TestCase):
 
         self.create_users()
         self.create_ejudge_problems()
+        self.create_judges()
 
         self.run = Run(
             user_id=self.users[0].id,
@@ -231,10 +233,11 @@ class TestUpdateFromEjudgeV1(TestCase):
         data = {
             'run_id': 10,
             'contest_id': self.run.ejudge_contest_id,
+            'judge_id': 1,
         }
         data.update(kwargs)
         url = url_for('problem.update_from_ejudge')
-        return self.client.post(url, json=data)
+        return self.client.post(url, json=data, headers=self.judge_headers(1))
 
     def test_updates_run_fields(self):
         resp = self.send_notification(status=EjudgeStatuses.OK.value,

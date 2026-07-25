@@ -3,6 +3,7 @@ x-rmatics-env: &rmatics-env
   PYTHONPATH: /code
   FLASK_APP: wsgi:application
   SECRET_KEY: ${SECRET_KEY}
+  TRUSTED_TOKEN: ${TRUSTED_TOKEN}
   URL_ENCODER_ALPHABET: abcdefg
   SQLALCHEMY_DATABASE_URI: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/pynformatics
   MONGO_URI: mongodb://${MONGO_HOST}:${MONGO_PORT}/pynformatics

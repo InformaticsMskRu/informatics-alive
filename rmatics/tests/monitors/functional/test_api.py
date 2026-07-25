@@ -77,7 +77,7 @@ class TestContestBasedMonitorGetApi(TestCase):
 
     def send_request(self, **data):
         url = url_for('monitor.crud', **data)
-        resp = self.client.get(url)
+        resp = self.client.get(url, headers=self.trusted_headers)
         return resp
 
     def test_simple(self):
@@ -133,7 +133,7 @@ class TestProblemBasedMonitorGetApi(TestCase):
 
     def send_request(self, **data):
         url = url_for('monitor.problem_monitor', **data)
-        resp = self.client.get(url)
+        resp = self.client.get(url, headers=self.trusted_headers)
         return resp
 
     def test_simple(self):

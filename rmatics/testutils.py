@@ -61,6 +61,9 @@ def _get_test_app():
     return _app
 
 
+TRUSTED_TOKEN = 'trusted-token'
+
+
 class TestCase(flask_testing.TestCase):
     CONFIG = {
         'SERVER_NAME': 'localhost',
@@ -74,6 +77,7 @@ class TestCase(flask_testing.TestCase):
         # app общий на все тесты — судейский конфиг сбрасываем явно
         self.app.extensions['judges'] = {}
         self.app.config['DEFAULT_JUDGE_ID'] = None
+        self.app.config['TRUSTED_TOKEN'] = TRUSTED_TOKEN
 
         db.drop_all()
         db.create_all()
@@ -86,6 +90,16 @@ class TestCase(flask_testing.TestCase):
         mongo.db.client.drop_database(mongo.db)
 
         redis.flushdb()
+
+    @property
+    def trusted_headers(self) -> dict:
+        """Заголовок, с которым pynformatics ходит в trusted api."""
+        return {'Authorization': f'Bearer {TRUSTED_TOKEN}'}
+
+    def judge_headers(self, judge_id: int) -> dict:
+        """Заголовок, с которым listener/notify-worker судьи judge_id
+        присылают нотификации (токен ejudge api этого judge)."""
+        return {'Authorization': f'Bearer {self.judges[judge_id].get_token()}'}
 
     def get_session(self):
         with self.client.session_transaction() as session:

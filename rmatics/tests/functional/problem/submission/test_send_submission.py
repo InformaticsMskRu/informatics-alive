@@ -47,7 +47,8 @@ class TestAPIProblemSubmission(TestCase):
 
             route = url_for('problem.trusted_submit', problem_id=problem_id)
 
-            return self.client.post(route, data=payload)
+            return self.client.post(route, data=payload,
+                                    headers=self.trusted_headers)
 
     def test_basic_request_with_context(self):
         context_id = 3

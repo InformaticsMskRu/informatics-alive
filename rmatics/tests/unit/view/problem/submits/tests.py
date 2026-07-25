@@ -48,7 +48,8 @@ class TestTrustedProblemSubmit(TestCase):
             'user_id': self.users[0].id,
             **kwargs
         }
-        response = self.client.post(url, data=data, content_type='multipart/form-data')
+        response = self.client.post(url, data=data, content_type='multipart/form-data',
+                                    headers=self.trusted_headers)
         return response
 
     @patch('rmatics.view.problem.problem.Run.update_source')
@@ -124,7 +125,7 @@ class TestGetSubmissionSource(TestCase):
     def send_request(self, run_id, data=None):
         data = data or {}
         url = url_for('problem.run_source', run_id=run_id, **data)
-        response = self.client.get(url)
+        response = self.client.get(url, headers=self.trusted_headers)
         return response
 
     def test_simple(self):
@@ -152,6 +153,7 @@ class TestUpdateSubmissionFromEjudge(TestCase):
 
         self.create_users()
         self.create_ejudge_problems()
+        self.create_judges()
 
         self.monitor_invalidate_mock = MagicMock()
 
@@ -178,7 +180,7 @@ class TestUpdateSubmissionFromEjudge(TestCase):
     def send_request_to_update_run(self, **data):
         data = json.dumps(data)
         url = url_for('problem.update_from_ejudge_v2')
-        resp = self.client.post(url, data=data)
+        resp = self.client.post(url, data=data, headers=self.judge_headers(1))
         return resp
 
 
@@ -276,7 +278,7 @@ class TestGetRunProtocol(TestCase):
     def send_request(self, run_id, data=None):
         data = data or {}
         url = url_for('problem.run_protocol', run_id=run_id, **data)
-        response = self.client.get(url)
+        response = self.client.get(url, headers=self.trusted_headers)
         return response
 
     def insert_protocol_to_mongo(self, run_id):

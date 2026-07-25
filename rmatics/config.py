@@ -44,6 +44,9 @@ class BaseConfig:
     # secrets
     SECRET_KEY = os.getenv('SECRET_KEY', 'secret_key')
 
+    # токен, под которым pynformatics ходит в trusted api
+    TRUSTED_TOKEN = os.getenv('TRUSTED_TOKEN', None)
+
     # databases
     URL_ENCODER_ALPHABET = os.getenv('URL_ENCODER_ALPHABET', 'abcdefg')
 

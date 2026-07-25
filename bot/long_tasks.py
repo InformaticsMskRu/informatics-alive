@@ -10,6 +10,9 @@ from pymongo import MongoClient
 BOT_AUTH_TOKEN = os.getenv('BOT_AUTH_TOKEN')
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
 RMATICS_SERVICE_URL = os.getenv('RMATICS_SERVICE_URL', 'http://localhost:12346/')
+# Токен, под которым ходят в trusted api rmatics
+TRUSTED_TOKEN = os.getenv('TRUSTED_TOKEN')
+RMATICS_HEADERS = {'Authorization': f'Bearer {TRUSTED_TOKEN}'}
 
 app = Celery('tasks', broker=CELERY_BROKER_URL)
 bot = telegram.Bot(BOT_AUTH_TOKEN)
@@ -29,7 +32,7 @@ def send_submit():
     }
     url = f'{RMATICS_SERVICE_URL}problem/trusted/{PROBLEM_ID}/submit_v2'
     try:
-        resp = requests.post(url, files={'file': file}, data=data)
+        resp = requests.post(url, files={'file': file}, data=data, headers=RMATICS_HEADERS)
     except (requests.ConnectionError, requests.ConnectTimeout):
         return 'Выглядит как rmatics отвалился', None
     except requests.RequestException:
@@ -59,7 +62,7 @@ def get_submission_status():
     args = '&'.join([f'{k}={v}' for k, v in args.items()])
     url = f'{RMATICS_SERVICE_URL}problem/{PROBLEM_ID}/submissions/?{args}'
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, headers=RMATICS_HEADERS)
     except (requests.ConnectionError, requests.ConnectTimeout):
         return 'Выглядит как rmatics отвалился', None
     except requests.RequestException:
