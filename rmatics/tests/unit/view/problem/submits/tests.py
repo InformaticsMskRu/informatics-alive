@@ -329,7 +329,7 @@ class TestGetRunProtocol(TestCase):
 
 
 class TestGetRunStatus(TestCase):
-    """Вердикт и балл по номеру посылки."""
+    """Вердикт, балл и номер теста по номеру посылки."""
 
     def setUp(self):
         super().setUp()
@@ -372,7 +372,8 @@ class TestGetRunStatus(TestCase):
         self.assert200(resp)
         self.assertEqual(resp.json['data'],
                          {'ejudge_status': EjudgeStatuses.PARTIAL.value,
-                          'ejudge_score': 40})
+                          'ejudge_score': 40,
+                          'ejudge_test_num': 3})
 
     def test_super_permissions(self):
         resp = self.send_request(self.foreign_run.id, {'is_admin': True})
@@ -387,6 +388,7 @@ class TestGetRunStatus(TestCase):
 
         self.assert200(resp)
         self.assertIsNone(resp.json['data']['ejudge_score'])
+        self.assertIsNone(resp.json['data']['ejudge_test_num'])
 
     def test_student_try_lookup_not_own_run(self):
         resp = self.send_request(self.foreign_run.id,
