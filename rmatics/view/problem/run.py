@@ -168,7 +168,7 @@ class ProtocolApi(MethodView):
 
 
 class RunStatusApi(MethodView):
-    """Вердикт и итоговый балл посылки — без протокола."""
+    """Вердикт, итоговый балл и номер теста посылки — без протокола."""
 
     get_args = {
         'is_admin': fields.Boolean(default=False, missing=False),
@@ -194,9 +194,10 @@ class RunStatusApi(MethodView):
         if run is None:
             raise NotFound(f'Run with id #{run_id} is not found')
 
-        # ejudge_score = null, пока посылка не оттестирована
+        # ejudge_score/ejudge_test_num = null, пока посылка не оттестирована
         return jsonify({'ejudge_status': run.ejudge_status,
-                        'ejudge_score': run.ejudge_score})
+                        'ejudge_score': run.ejudge_score,
+                        'ejudge_test_num': run.ejudge_test_num})
 
 
 class UpdateRunFromEjudgeAPIv1(MethodView):
