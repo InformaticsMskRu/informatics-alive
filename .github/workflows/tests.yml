@@ -64,11 +64,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install mysql client
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends default-mysql-client
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -77,12 +72,30 @@ jobs:
       - name: Create databases
         # Wait for mariadb to accept auth (health "alive" can precede the root
         # grant being ready), then create the moodle/ejudge/pynformatics/informatics schemas.
+        # Done with pymysql (installed above) rather than the mysql client:
+        # installing it with apt in the python:3.6 image (Debian 11) fails
+        # with 404s from security.debian.org.
+        shell: python
         run: |
-          for i in $(seq 1 30); do
-            if mysql -h mariadb -u root -p123456 -e "SELECT 1" >/dev/null 2>&1; then break; fi
-            echo "waiting for mariadb..."; sleep 2
-          done
-          mysql -h mariadb -u root -p123456 < docker/create-databases.sql
+          import time
+          import pymysql
+
+          for _ in range(30):
+              try:
+                  conn = pymysql.connect(host='mariadb', user='root', password='123456')
+                  break
+              except pymysql.err.OperationalError:
+                  print('waiting for mariadb...', flush=True)
+                  time.sleep(2)
+          else:
+              raise SystemExit('mariadb did not accept connections')
+
+          with open('docker/create-databases.sql') as f:
+              statements = [s.strip() for s in f.read().split(';') if s.strip()]
+          with conn.cursor() as cursor:
+              for statement in statements:
+                  cursor.execute(statement)
+          conn.close()
 
       - name: Run rmatics tests
         working-directory: rmatics
