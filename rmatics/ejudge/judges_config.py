@@ -1,8 +1,11 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from flask import Flask, current_app
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class JudgeConfig:
@@ -11,12 +14,39 @@ class JudgeConfig:
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
     lang_map: Dict[int, int] = field(default_factory=dict)
+    # rmatics lang_id -> short name with version, e.g. {27: 'Python 3.9'}.
+    # None: the judge doesn't declare its languages.
+    langs: Optional[Dict[int, str]] = field(default=None)
 
     def get_token(self) -> Optional[str]:
         return self.token
 
+    def supports_lang(self, lang_id: int) -> bool:
+        return self.langs is None or lang_id in self.langs
+
     def map_lang_id(self, lang_id: int) -> int:
         return self.lang_map.get(lang_id, lang_id)
+
+
+def _parse_langs(jid, raw) -> Optional[Dict[int, str]]:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        logger.warning(f'Judge {jid}: "langs" must be an object, ignoring it')
+        return None
+
+    langs = {}
+    for lang_id, name in raw.items():
+        try:
+            lang_id = int(lang_id)
+        except (TypeError, ValueError):
+            logger.warning(f'Judge {jid}: invalid lang_id {lang_id!r} in "langs", skipping')
+            continue
+        if not isinstance(name, str) or not name.strip():
+            logger.warning(f'Judge {jid}: empty name for lang_id {lang_id} in "langs", skipping')
+            continue
+        langs[lang_id] = name.strip()
+    return langs
 
 
 def _load(path: str) -> Dict[int, JudgeConfig]:
@@ -28,7 +58,8 @@ def _load(path: str) -> Dict[int, JudgeConfig]:
             name=cfg.get('name', ''),
             token=cfg.get('token'),
             sender_user_id=cfg.get('sender_user_id', 5),
-            lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()}
+            lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()},
+            langs=_parse_langs(jid, cfg.get('langs')),
         )
         for jid, cfg in data.items()
     }
@@ -76,8 +107,11 @@ def init_app(app: Flask) -> None:
 
 
 def get_default_judge_id() -> Optional[int]:
-    raw = current_app.config.get('DEFAULT_JUDGE_ID')
-    return int(raw) if raw is not None else None
+    # an invalid value is already reported by init_app
+    try:
+        return int(current_app.config.get('DEFAULT_JUDGE_ID'))
+    except (TypeError, ValueError):
+        return None
 
 def get_judge(judge_id: int) -> Optional[JudgeConfig]:
     return current_app.extensions.get('judges', {}).get(judge_id)

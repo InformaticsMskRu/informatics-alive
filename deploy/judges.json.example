@@ -5,5 +5,9 @@
     "token": "your token here...",
     "sender_user_id": 1,
     "lang_map": {},
+    "langs": {
+      "3": "GNU C++ 11.2",
+      "27": "Python 3.9"
+    }
   }
 }

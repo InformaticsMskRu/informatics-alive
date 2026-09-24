@@ -13,6 +13,11 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
+from rmatics.ejudge.routing import (
+    LANGUAGE_NOT_AVAILABLE_MESSAGE,
+    LanguageNotAvailable,
+    resolve_route,
+)
 from rmatics.ejudge.submit_queue.task import (
     submit_task,
 )
@@ -42,6 +47,10 @@ class TrustedSubmitApi(MethodView):
         'context_id': fields.Integer(required=False),
         'context_source': fields.Integer(required=False, missing=DEFAULT_MOODLE_CONTEXT_SOURCE),
         'is_visible': fields.Boolean(required=False, missing=True),
+
+        # Set by pynformatics for site administrators: judges_settings
+        # user_ids restrictions don't apply to their submissions
+        'ignore_user_ids': fields.Boolean(required=False, missing=False),
     }
 
     @staticmethod
@@ -76,6 +85,7 @@ class TrustedSubmitApi(MethodView):
         context_id = args.get('context_id')
         context_source = args.get('context_source', DEFAULT_MOODLE_CONTEXT_SOURCE)
         is_visible = args.get('is_visible', True)
+        ignore_user_ids = args.get('ignore_user_ids', False)
 
         # Здесь НЕЛЬЗЯ использовать .get(problem_id), см EjudgeProblem.__doc__
         problem = db.session.query(EjudgeProblem) \
@@ -87,6 +97,11 @@ class TrustedSubmitApi(MethodView):
 
         if int(user_id) <= 0:
             raise BadRequest('Wrong user status')
+
+        try:
+            resolve_route(problem, language_id, user_id, ignore_user_ids)
+        except LanguageNotAvailable:
+            raise BadRequest(LANGUAGE_NOT_AVAILABLE_MESSAGE)
 
         try:
             limit = 64
@@ -119,6 +134,7 @@ class TrustedSubmitApi(MethodView):
             # Context related properties
             context_source=context_source,
             is_visible=is_visible,
+            ignore_user_ids=ignore_user_ids,
         )
         # If it's context aware submission,
         # overwrite statement_id with context
