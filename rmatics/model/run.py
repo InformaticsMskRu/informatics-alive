@@ -65,9 +65,6 @@ class Run(db.Model):
     context_source = db.Column(db.Integer, nullable=True)
     # Run is visible by default
     is_visible = db.Column(db.Boolean, nullable=True, default=True)
-    # Submitted by a site administrator: judges_settings user_ids are
-    # ignored when routing it, on submit and on rejudge alike
-    ignore_user_ids = db.Column(db.Boolean, nullable=True, default=False)
 
     def update_source(self, blob: bytes):
         mongo.db.source.insert_one({

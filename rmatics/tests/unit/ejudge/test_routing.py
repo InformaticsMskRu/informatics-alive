@@ -58,14 +58,13 @@ class TestResolveRoute(TestCase):
         problem = _problem([{'judge_id': 99, 'contest_id': 500, 'problem_id': 6}])
         self.assertEqual(resolve_route(problem, 27, USER), Route(99, 500, 6))
 
+    def test_user_ids_entry_routes_listed_user(self):
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
+                             'user_ids': [USER]}])
+        self.assertEqual(resolve_route(problem, 27, USER), Route(2, 500, 6))
+
     def test_user_ids_entry_for_another_user_is_rejected(self):
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
                              'user_ids': [USER]}])
         with self.assertRaises(LanguageNotAvailable):
             resolve_route(problem, 27, OTHER_USER)
-
-    def test_ignore_user_ids_opens_user_entries(self):
-        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
-                             'user_ids': [USER]}])
-        self.assertEqual(resolve_route(problem, 27, OTHER_USER, ignore_user_ids=True),
-                         Route(2, 500, 6))

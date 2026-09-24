@@ -109,24 +109,43 @@ class TestAPIProblemSubmission(TestCase):
         self.assert400(resp)
         self.assertEqual(db.session.query(Run).count(), 0)
 
-    def test_ignore_user_ids_is_stored(self):
-        self.create_judges()
-        problem = self.ejudge_problems[1]
-        problem.judges_settings = [
-            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
-             'user_ids': [self.user2.id]},
-        ]
+    def test_statement_allowed_languages(self):
+        statement = self.statements[0]
+        statement.settings = {'allowed_languages': [27]}
+        db.session.commit()
+        problem_id = self.ejudge_problems[1].id
+
+        self.assert400(self.send_request(problem_id, lang_id=1, statement_id=statement.id))
+        self.assertEqual(db.session.query(Run).count(), 0)
+        self.assert200(self.send_request(problem_id, lang_id=27, statement_id=statement.id))
+
+    def test_context_id_is_the_statement(self):
+        statement = self.statements[0]
+        statement.settings = {'allowed_languages': [27]}
         db.session.commit()
 
-        self.assert400(self.send_request(problem.id))
+        resp = self.send_request(self.ejudge_problems[1].id, lang_id=1,
+                                 statement_id=self.statements[1].id,
+                                 context_id=statement.id)
 
-        resp = self.send_request(problem.id, ignore_user_ids=True)
-        self.assert200(resp)
-        run = db.session.query(Run).get(resp.json['data']['run_id'])
-        self.assertTrue(run.ignore_user_ids)
+        self.assert400(resp)
 
-    def test_ignore_user_ids_defaults_to_false(self):
-        resp = self.send_request(self.ejudge_problems[1].id)
+    def test_statement_without_allowed_languages(self):
+        self.statements[0].settings = {'allowed_languages': []}
+        db.session.commit()
+
+        resp = self.send_request(self.ejudge_problems[1].id, lang_id=1,
+                                 statement_id=self.statements[0].id)
+
         self.assert200(resp)
-        run = db.session.query(Run).get(resp.json['data']['run_id'])
-        self.assertFalse(run.ignore_user_ids)
+
+    def test_output_only_skips_allowed_languages(self):
+        statement = self.statements[0]
+        statement.settings = {'allowed_languages': [27]}
+        problem = self.ejudge_problems[1]
+        problem.output_only = True
+        db.session.commit()
+
+        resp = self.send_request(problem.id, lang_id=0, statement_id=statement.id)
+
+        self.assert200(resp)

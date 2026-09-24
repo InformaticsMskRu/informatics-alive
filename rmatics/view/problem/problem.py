@@ -27,6 +27,7 @@ from rmatics.model.base import db
 from rmatics.model.group import UserGroup
 from rmatics.model.problem import Problem, EjudgeProblem
 from rmatics.model.run import Run
+from rmatics.model.statement import Statement
 from rmatics.model.user import SimpleUser
 from rmatics.utils.response import jsonify
 from rmatics.view import get_problems_by_statement_id
@@ -47,10 +48,6 @@ class TrustedSubmitApi(MethodView):
         'context_id': fields.Integer(required=False),
         'context_source': fields.Integer(required=False, missing=DEFAULT_MOODLE_CONTEXT_SOURCE),
         'is_visible': fields.Boolean(required=False, missing=True),
-
-        # Set by pynformatics for site administrators: judges_settings
-        # user_ids restrictions don't apply to their submissions
-        'ignore_user_ids': fields.Boolean(required=False, missing=False),
     }
 
     @staticmethod
@@ -85,7 +82,6 @@ class TrustedSubmitApi(MethodView):
         context_id = args.get('context_id')
         context_source = args.get('context_source', DEFAULT_MOODLE_CONTEXT_SOURCE)
         is_visible = args.get('is_visible', True)
-        ignore_user_ids = args.get('ignore_user_ids', False)
 
         # Здесь НЕЛЬЗЯ использовать .get(problem_id), см EjudgeProblem.__doc__
         problem = db.session.query(EjudgeProblem) \
@@ -99,8 +95,18 @@ class TrustedSubmitApi(MethodView):
             raise BadRequest('Wrong user status')
 
         try:
-            resolve_route(problem, language_id, user_id, ignore_user_ids)
+            resolve_route(problem, language_id, user_id)
         except LanguageNotAvailable:
+            raise BadRequest(LANGUAGE_NOT_AVAILABLE_MESSAGE)
+
+        # The statement's allowed_languages is a policy of the context the
+        # run is submitted in: checked here only, not again on rejudge.
+        # context_id replaces statement_id on the run (see below).
+        # Output-only answers are plain text, not a language.
+        run_statement_id = context_id or statement_id
+        statement = db.session.query(Statement).get(run_statement_id) if run_statement_id else None
+        if statement is not None and not problem.output_only and \
+                not statement.is_language_allowed(language_id):
             raise BadRequest(LANGUAGE_NOT_AVAILABLE_MESSAGE)
 
         try:
@@ -134,7 +140,6 @@ class TrustedSubmitApi(MethodView):
             # Context related properties
             context_source=context_source,
             is_visible=is_visible,
-            ignore_user_ids=ignore_user_ids,
         )
         # If it's context aware submission,
         # overwrite statement_id with context

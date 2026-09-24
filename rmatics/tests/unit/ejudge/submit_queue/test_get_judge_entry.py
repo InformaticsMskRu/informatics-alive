@@ -8,8 +8,8 @@ def _problem(settings):
     return mock.Mock(judges_settings=settings, id=1)
 
 
-def _call(settings, lang_id=1, user_id=1, ignore_user_ids=False):
-    return _get_judge_entry(_problem(settings), lang_id, user_id, ignore_user_ids)
+def _call(settings, lang_id=1, user_id=1):
+    return _get_judge_entry(_problem(settings), lang_id, user_id)
 
 
 class TestGetJudgeEntry(TestCase):
@@ -143,28 +143,4 @@ class TestGetJudgeEntry(TestCase):
         self.assertIsNone(_call(
             [{'contest_id': 1, 'problem_id': 1, 'lang_ids': [99]}],
             lang_id=1,
-        ))
-
-    # --- ignore_user_ids (site administrators) ---
-
-    def test_ignore_user_ids_matches_other_users_entry(self):
-        result = _call(
-            [{'contest_id': 1, 'problem_id': 1, 'user_ids': [42]}],
-            user_id=1, ignore_user_ids=True,
-        )
-        self.assertIsNotNone(result)
-
-    def test_ignore_user_ids_does_not_add_specificity(self):
-        # without user_ids counting, both entries are equally specific:
-        # the first listed wins
-        result = _call([
-            {'contest_id': 1, 'problem_id': 1},
-            {'contest_id': 2, 'problem_id': 2, 'user_ids': [1]},
-        ], user_id=1, ignore_user_ids=True)
-        self.assertEqual(result['contest_id'], 1)
-
-    def test_ignore_user_ids_keeps_lang_filter(self):
-        self.assertIsNone(_call(
-            [{'contest_id': 1, 'problem_id': 1, 'lang_ids': [27], 'user_ids': [1]}],
-            lang_id=1, ignore_user_ids=True,
         ))

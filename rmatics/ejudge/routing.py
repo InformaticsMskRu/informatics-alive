@@ -24,8 +24,7 @@ class Route(NamedTuple):
 _REQUIRED_ENTRY_KEYS = ('contest_id', 'problem_id')
 
 
-def _get_judge_entry(problem, lang_id: int, user_id: int,
-                     ignore_user_ids: bool = False) -> Optional[dict]:
+def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
     """Return the highest-priority matching judges_settings entry for (lang_id, user_id).
 
     judges_settings is a list of entries:
@@ -53,9 +52,6 @@ def _get_judge_entry(problem, lang_id: int, user_id: int,
     Entries missing contest_id or problem_id are skipped with a warning.
     Among valid candidates, higher specificity (more filters set) wins;
     listed order breaks ties. Returns None when no entry matches.
-
-    ignore_user_ids (site administrators' runs): user_ids neither filters
-    nor adds specificity, as if it were absent in every entry.
     """
     settings = problem.judges_settings
     if not settings:
@@ -71,7 +67,7 @@ def _get_judge_entry(problem, lang_id: int, user_id: int,
             )
             continue
         lang_ids = entry.get('lang_ids')
-        user_ids = None if ignore_user_ids else entry.get('user_ids')
+        user_ids = entry.get('user_ids')
         if (lang_ids is None or lang_id in lang_ids) and \
            (user_ids is None or user_id in user_ids):
             candidates.append(entry)
@@ -82,14 +78,13 @@ def _get_judge_entry(problem, lang_id: int, user_id: int,
     candidates.sort(
         key=lambda e: -(
             (e.get('lang_ids') is not None) +
-            (not ignore_user_ids and e.get('user_ids') is not None)
+            (e.get('user_ids') is not None)
         )
     )
     return candidates[0]
 
 
-def resolve_route(problem, lang_id: int, user_id: int,
-                  ignore_user_ids: bool = False) -> Route:
+def resolve_route(problem, lang_id: int, user_id: int) -> Route:
     """Where a run in lang_id by user_id goes.
 
     A problem with judges_settings accepts only languages that some entry
@@ -100,7 +95,7 @@ def resolve_route(problem, lang_id: int, user_id: int,
     judge_id may be None (no DEFAULT_JUDGE_ID) and may be unknown to the
     config: reporting that is up to the caller.
     """
-    entry = _get_judge_entry(problem, lang_id, user_id, ignore_user_ids)
+    entry = _get_judge_entry(problem, lang_id, user_id)
 
     if entry is None:
         if problem.judges_settings:

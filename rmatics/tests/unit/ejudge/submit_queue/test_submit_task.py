@@ -28,13 +28,12 @@ class SubmitTaskTestCase(TestCase):
 
         self.run = self._make_run()
 
-    def _make_run(self, lang_id=27, user=0, ignore_user_ids=False):
+    def _make_run(self, lang_id=27):
         run = Run(
-            user_id=self.users[user].id,
+            user_id=self.users[0].id,
             problem_id=self.ejudge_problems[0].id,
             statement_id=self.statements[0].id,
             create_time=datetime.datetime(2026, 7, 10, 12, 0, 0),
-            ignore_user_ids=ignore_user_ids,
             ejudge_contest_id=self.ejudge_problems[0].ejudge_contest_id,
             lang_id=lang_id,
             ejudge_status=EjudgeStatuses.IN_QUEUE.value,
@@ -234,20 +233,3 @@ class TestSubmitTaskLanguageNotAvailable(SubmitTaskTestCase):
         submit_task.delay(self.run.id)
 
         submit_mock.assert_not_called()
-
-    @mock.patch(SUBMIT_PATH)
-    def test_admin_run_ignores_user_ids(self, submit_mock):
-        """Посылка администратора (и её перетестирование) идёт по записи
-        с чужими user_ids."""
-        submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
-        problem = self.ejudge_problems[0]
-        problem.judges_settings = [
-            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
-             'user_ids': [self.users[1].id]},
-        ]
-        db.session.commit()
-        run = self._make_run(ignore_user_ids=True)
-
-        submit_task.delay(run.id)
-
-        self.assertEqual(submit_mock.call_args[1]['contest_id'], 500)

@@ -64,8 +64,7 @@ def submit_task(self, run_id):
     centrifugo_client.send_problem_run_updates(run.problem_id, run)
 
     try:
-        judge_id, contest_id, prob_id = resolve_route(
-            problem, run.lang_id, run.user_id, bool(run.ignore_user_ids))
+        judge_id, contest_id, prob_id = resolve_route(problem, run.lang_id, run.user_id)
     except LanguageNotAvailable as e:
         # judges_settings may have changed since the submit was accepted
         # (or the run is being rejudged)
