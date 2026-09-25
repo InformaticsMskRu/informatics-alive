@@ -33,9 +33,10 @@ class JudgeConfig:
 
     def map_lang_id(self, lang_id: int) -> int:
         if self.langs is not None:
-            # a language outside langs only gets here for output-only problems
-            lang = self.langs.get(lang_id)
-            return lang.ejudge_lang_id if lang is not None else lang_id
+            if lang_id not in self.langs:
+                # routing (resolve_route) only lets supported languages through
+                raise ValueError(f'lang_id {lang_id} is not in the judge langs')
+            return self.langs[lang_id].ejudge_lang_id
         return self.lang_map.get(lang_id, lang_id)
 
 

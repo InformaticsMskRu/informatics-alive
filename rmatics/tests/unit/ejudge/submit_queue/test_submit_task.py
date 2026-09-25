@@ -248,3 +248,19 @@ class TestSubmitTaskLanguageNotSupported(SubmitTaskTestCase):
         submit_task.delay(self.run.id)
 
         self.assertEqual(submit_mock.call_args[1]['lang_id'], 64)
+
+    @mock.patch(SUBMIT_PATH)
+    def test_output_only_lang_id_is_sent_as_is(self, submit_mock):
+        submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 62)}
+        problem = self.ejudge_problems[0]
+        problem.output_only = True
+        problem.judges_settings = [
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
+        ]
+        db.session.commit()
+        run = self._make_run(lang_id=0)
+
+        submit_task.delay(run.id)
+
+        self.assertEqual(submit_mock.call_args[1]['lang_id'], 0)

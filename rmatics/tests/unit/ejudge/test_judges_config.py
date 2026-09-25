@@ -57,9 +57,10 @@ class TestMapLangId(TestCase):
                             langs={27: JudgeLang('Python 3.9', 62)})
         self.assertEqual(judge.map_lang_id(27), 62)
 
-    def test_output_only_lang_outside_langs(self):
-        judge = JudgeConfig(url='u', lang_map={0: 99}, langs={27: JudgeLang('Python 3.9', 62)})
-        self.assertEqual(judge.map_lang_id(0), 0)
+    def test_lang_outside_langs_raises(self):
+        judge = JudgeConfig(url='u', lang_map={3: 99}, langs={27: JudgeLang('Python 3.9', 62)})
+        with self.assertRaises(ValueError):
+            judge.map_lang_id(3)
 
     def test_lang_map_without_langs(self):
         judge = JudgeConfig(url='u', lang_map={27: 62})

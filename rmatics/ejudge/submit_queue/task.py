@@ -88,7 +88,8 @@ def submit_task(self, run_id):
     entry_url = judge.url
     entry_token = judge.get_token()
     sender_user_id = judge.sender_user_id
-    lang_id = judge.map_lang_id(run.lang_id)
+    # output-only answers are plain text: sent as is, not a language of the judge
+    lang_id = run.lang_id if problem.output_only else judge.map_lang_id(run.lang_id)
 
     file = run.source
 
