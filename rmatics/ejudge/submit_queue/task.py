@@ -9,8 +9,7 @@ from rmatics.utils.run import EjudgeStatuses
 
 from rmatics.ejudge.judges_config import get_judge
 from rmatics.ejudge.routing import (  # noqa: F401 (_get_judge_entry is imported by tests)
-    LANGUAGE_NOT_AVAILABLE_MESSAGE,
-    LanguageNotAvailable,
+    LanguageNotSupported,
     _get_judge_entry,
     resolve_route,
 )
@@ -65,12 +64,12 @@ def submit_task(self, run_id):
 
     try:
         judge_id, contest_id, prob_id = resolve_route(problem, run.lang_id, run.user_id)
-    except LanguageNotAvailable as e:
+    except LanguageNotSupported as e:
         # judges_settings may have changed since the submit was accepted
         # (or the run is being rejudged)
-        logger.error(f'Run #{run_id}: {e}')
+        logger.error(f'Run #{run_id}: {e.reason}')
         _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, None)
-        run.protocol = _build_submit_error_protocol(run_id, LANGUAGE_NOT_AVAILABLE_MESSAGE)
+        run.protocol = _build_submit_error_protocol(run_id, e.description)
         return
 
     if judge_id is None:

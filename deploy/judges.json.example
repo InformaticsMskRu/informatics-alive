@@ -4,10 +4,9 @@
     "url": "http://localhost/cgi-bin/new-master",
     "token": "your token here...",
     "sender_user_id": 1,
-    "lang_map": {},
     "langs": {
-      "3": "GNU C++ 11.2",
-      "27": "Python 3.9"
+      "3": {"name": "GNU C++ 11.2", "ejudge_lang_id": 3},
+      "27": {"name": "Python 3.9", "ejudge_lang_id": 62}
     }
   }
 }

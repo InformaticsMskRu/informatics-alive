@@ -13,11 +13,7 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
-from rmatics.ejudge.routing import (
-    LANGUAGE_NOT_AVAILABLE_MESSAGE,
-    LanguageNotAvailable,
-    resolve_route,
-)
+from rmatics.ejudge.routing import LanguageNotAllowed, resolve_route
 from rmatics.ejudge.submit_queue.task import (
     submit_task,
 )
@@ -94,10 +90,7 @@ class TrustedSubmitApi(MethodView):
         if int(user_id) <= 0:
             raise BadRequest('Wrong user status')
 
-        try:
-            resolve_route(problem, language_id, user_id)
-        except LanguageNotAvailable:
-            raise BadRequest(LANGUAGE_NOT_AVAILABLE_MESSAGE)
+        resolve_route(problem, language_id, user_id)
 
         # The statement's allowed_languages is a policy of the context the
         # run is submitted in: checked here only, not again on rejudge.
@@ -107,7 +100,7 @@ class TrustedSubmitApi(MethodView):
         statement = db.session.query(Statement).get(run_statement_id) if run_statement_id else None
         if statement is not None and not problem.output_only and \
                 not statement.is_language_allowed(language_id):
-            raise BadRequest(LANGUAGE_NOT_AVAILABLE_MESSAGE)
+            raise LanguageNotAllowed()
 
         try:
             limit = 64

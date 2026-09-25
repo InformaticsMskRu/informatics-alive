@@ -2,7 +2,7 @@ import json
 import os
 import tempfile
 
-from rmatics.ejudge.judges_config import JudgeConfig, _load, get_default_judge_id
+from rmatics.ejudge.judges_config import JudgeConfig, JudgeLang, _load, get_default_judge_id
 from rmatics.testutils import TestCase
 
 
@@ -19,21 +19,52 @@ class TestJudgesConfigLangs(TestCase):
         self.assertIsNone(self._load({}).langs)
 
     def test_langs_parsed(self):
-        judge = self._load({'langs': {'27': ' Python 3.9 ', '3': 'GNU C++ 11.2'}})
-        self.assertEqual(judge.langs, {27: 'Python 3.9', 3: 'GNU C++ 11.2'})
+        judge = self._load({'langs': {
+            '27': {'name': ' Python 3.9 ', 'ejudge_lang_id': 62},
+            '3': {'name': 'GNU C++ 11.2', 'ejudge_lang_id': 3},
+        }})
+        self.assertEqual(judge.langs, {27: JudgeLang('Python 3.9', 62),
+                                       3: JudgeLang('GNU C++ 11.2', 3)})
 
     def test_invalid_entries_are_skipped(self):
-        judge = self._load({'langs': {'x': 'Bad id', '1': '', '2': None, '3': 'C++'}})
-        self.assertEqual(judge.langs, {3: 'C++'})
+        judge = self._load({'langs': {
+            'x': {'name': 'Bad id', 'ejudge_lang_id': 1},
+            '1': {'name': '', 'ejudge_lang_id': 1},
+            '2': {'name': 'No ejudge id'},
+            '4': {'name': 'Bool id', 'ejudge_lang_id': True},
+            '5': 'Name only',
+            '3': {'name': 'C++', 'ejudge_lang_id': 3},
+        }})
+        self.assertEqual(judge.langs, {3: JudgeLang('C++', 3)})
 
     def test_langs_not_an_object_is_ignored(self):
         self.assertIsNone(self._load({'langs': ['Python 3.9']}).langs)
 
     def test_supports_lang(self):
         self.assertTrue(JudgeConfig(url='u').supports_lang(27))
-        judge = JudgeConfig(url='u', langs={3: 'C++'})
+        judge = JudgeConfig(url='u', langs={3: JudgeLang('C++', 3)})
         self.assertTrue(judge.supports_lang(3))
         self.assertFalse(judge.supports_lang(27))
+
+
+class TestMapLangId(TestCase):
+    def test_langs_mapping(self):
+        judge = JudgeConfig(url='u', langs={27: JudgeLang('Python 3.9', 62)})
+        self.assertEqual(judge.map_lang_id(27), 62)
+
+    def test_lang_map_is_ignored_when_langs_declared(self):
+        judge = JudgeConfig(url='u', lang_map={27: 99},
+                            langs={27: JudgeLang('Python 3.9', 62)})
+        self.assertEqual(judge.map_lang_id(27), 62)
+
+    def test_output_only_lang_outside_langs(self):
+        judge = JudgeConfig(url='u', lang_map={0: 99}, langs={27: JudgeLang('Python 3.9', 62)})
+        self.assertEqual(judge.map_lang_id(0), 0)
+
+    def test_lang_map_without_langs(self):
+        judge = JudgeConfig(url='u', lang_map={27: 62})
+        self.assertEqual(judge.map_lang_id(27), 62)
+        self.assertEqual(judge.map_lang_id(3), 3)
 
 
 class TestDefaultJudgeId(TestCase):

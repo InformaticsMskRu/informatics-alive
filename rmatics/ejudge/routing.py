@@ -2,17 +2,27 @@
 from typing import NamedTuple, Optional
 
 from celery.utils.log import get_task_logger
+from werkzeug.exceptions import BadRequest
 
 from rmatics.ejudge.judges_config import get_default_judge_id, get_judge
 
 logger = get_task_logger(__name__)
 
 
-LANGUAGE_NOT_AVAILABLE_MESSAGE = 'Язык недоступен для этой задачи'
+class LanguageNotSupported(BadRequest):
+    """No judge of the problem accepts the language."""
+    error_code = 'language_not_supported'
+    description = 'Язык не поддерживается для этой задачи'
+
+    def __init__(self, reason: str):
+        super().__init__()
+        self.reason = reason  # for logs; description is shown to the user
 
 
-class LanguageNotAvailable(Exception):
-    pass
+class LanguageNotAllowed(BadRequest):
+    """The statement (contest) doesn't allow the language."""
+    error_code = 'language_not_allowed'
+    description = 'Язык запрещён в этом контесте'
 
 
 class Route(NamedTuple):
@@ -89,8 +99,9 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
 
     A problem with judges_settings accepts only languages that some entry
     routes to a judge supporting them (see JudgeConfig.langs); otherwise
-    LanguageNotAvailable is raised instead of falling back to the default
-    judge. Problems without judges_settings always go to the default judge.
+    LanguageNotSupported is raised instead of falling back to the default
+    judge. Problems without judges_settings go to the default judge, and
+    are checked against its langs when it declares them.
 
     judge_id may be None (a problem without judges_settings and no
     DEFAULT_JUDGE_ID) and may be unknown to the config: reporting that is up
@@ -100,17 +111,18 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
 
     if entry is None:
         if problem.judges_settings:
-            raise LanguageNotAvailable(
+            raise LanguageNotSupported(
                 f'Problem #{problem.id}: no judges_settings entry for lang_id {lang_id}'
             )
-        return Route(get_default_judge_id(), problem.ejudge_contest_id, problem.problem_id)
+        route = Route(get_default_judge_id(), problem.ejudge_contest_id, problem.problem_id)
+    else:
+        route = Route(int(entry['judge_id']), entry['contest_id'], entry['problem_id'])
 
-    judge_id = int(entry['judge_id'])
-    judge = get_judge(judge_id)
+    judge = get_judge(route.judge_id)
     # output-only answers are plain text, not a language of the judge
     if judge is not None and not problem.output_only and not judge.supports_lang(lang_id):
-        raise LanguageNotAvailable(
-            f'Problem #{problem.id}: judge {judge_id} does not support lang_id {lang_id}'
+        raise LanguageNotSupported(
+            f'Problem #{problem.id}: judge {route.judge_id} does not support lang_id {lang_id}'
         )
 
-    return Route(judge_id, entry['contest_id'], entry['problem_id'])
+    return route

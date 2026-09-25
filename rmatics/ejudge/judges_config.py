@@ -8,15 +8,22 @@ from flask import Flask, current_app
 logger = logging.getLogger(__name__)
 
 @dataclass
+class JudgeLang:
+    name: str            # short name with version, e.g. 'Python 3.9'
+    ejudge_lang_id: int  # id of this language inside the judge's ejudge
+
+
+@dataclass
 class JudgeConfig:
     url: str
     name: str = field(default='')
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
+    # Deprecated: ignored when langs is declared
     lang_map: Dict[int, int] = field(default_factory=dict)
-    # rmatics lang_id -> short name with version, e.g. {27: 'Python 3.9'}.
-    # None: the judge doesn't declare its languages.
-    langs: Optional[Dict[int, str]] = field(default=None)
+    # rmatics lang_id -> language of the judge. None: the judge doesn't
+    # declare its languages (no language check, lang_map/identity mapping).
+    langs: Optional[Dict[int, JudgeLang]] = field(default=None)
 
     def get_token(self) -> Optional[str]:
         return self.token
@@ -25,10 +32,20 @@ class JudgeConfig:
         return self.langs is None or lang_id in self.langs
 
     def map_lang_id(self, lang_id: int) -> int:
+        if self.langs is not None:
+            # a language outside langs only gets here for output-only problems
+            lang = self.langs.get(lang_id)
+            return lang.ejudge_lang_id if lang is not None else lang_id
         return self.lang_map.get(lang_id, lang_id)
 
 
-def _parse_langs(jid, raw) -> Optional[Dict[int, str]]:
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _parse_langs(jid, raw) -> Optional[Dict[int, JudgeLang]]:
+    """{"<lang_id>": {"name": <str>, "ejudge_lang_id": <int>}}; invalid
+    entries are skipped with a warning."""
     if raw is None:
         return None
     if not isinstance(raw, dict):
@@ -36,16 +53,21 @@ def _parse_langs(jid, raw) -> Optional[Dict[int, str]]:
         return None
 
     langs = {}
-    for lang_id, name in raw.items():
+    for lang_id, lang in raw.items():
         try:
             lang_id = int(lang_id)
         except (TypeError, ValueError):
             logger.warning(f'Judge {jid}: invalid lang_id {lang_id!r} in "langs", skipping')
             continue
-        if not isinstance(name, str) or not name.strip():
-            logger.warning(f'Judge {jid}: empty name for lang_id {lang_id} in "langs", skipping')
+        name = lang.get('name') if isinstance(lang, dict) else None
+        ejudge_lang_id = lang.get('ejudge_lang_id') if isinstance(lang, dict) else None
+        if not isinstance(name, str) or not name.strip() or not _is_int(ejudge_lang_id):
+            logger.warning(
+                f'Judge {jid}: lang_id {lang_id} in "langs" needs "name" and an integer '
+                f'"ejudge_lang_id", skipping: {lang!r}'
+            )
             continue
-        langs[lang_id] = name.strip()
+        langs[lang_id] = JudgeLang(name=name.strip(), ejudge_lang_id=ejudge_lang_id)
     return langs
 
 
@@ -70,6 +92,12 @@ def _validate(app: Flask, judges: Dict[int, JudgeConfig]) -> bool:
         if judge.token is None:
             app.logger.error(f'No token provided for judge {jid}')
             return False
+        if judge.lang_map and judge.langs is not None:
+            app.logger.warning(f'Judge {jid}: "lang_map" is ignored because "langs" is declared')
+        elif judge.lang_map:
+            app.logger.warning(
+                f'Judge {jid}: "lang_map" is deprecated, describe the languages in "langs"'
+            )
     
     return True
 

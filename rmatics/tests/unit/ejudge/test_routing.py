@@ -1,6 +1,7 @@
 from unittest import mock
 
-from rmatics.ejudge.routing import LanguageNotAvailable, Route, resolve_route
+from rmatics.ejudge.judges_config import JudgeLang
+from rmatics.ejudge.routing import LanguageNotSupported, Route, resolve_route
 from rmatics.testutils import TestCase
 
 USER = 1
@@ -20,9 +21,15 @@ class TestResolveRoute(TestCase):
     def test_no_settings_goes_to_default_judge(self):
         self.assertEqual(resolve_route(_problem(), 27, USER), Route(1, 100, 3))
 
-    def test_no_settings_ignores_default_judge_langs(self):
-        self.judges[1].langs = {3: 'GNU C++ 11.2'}
-        self.assertEqual(resolve_route(_problem(), 27, USER), Route(1, 100, 3))
+    def test_no_settings_checks_default_judge_langs(self):
+        self.judges[1].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        self.assertEqual(resolve_route(_problem(), 3, USER), Route(1, 100, 3))
+        with self.assertRaises(LanguageNotSupported):
+            resolve_route(_problem(), 27, USER)
+
+    def test_no_settings_output_only_skips_default_judge_langs(self):
+        self.judges[1].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        self.assertEqual(resolve_route(_problem(output_only=True), 0, USER), Route(1, 100, 3))
 
     def test_entry_route(self):
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6}])
@@ -31,30 +38,30 @@ class TestResolveRoute(TestCase):
     def test_no_matching_entry_is_rejected(self):
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
                              'lang_ids': [3]}])
-        with self.assertRaises(LanguageNotAvailable):
+        with self.assertRaises(LanguageNotSupported):
             resolve_route(problem, 27, USER)
 
     def test_judge_without_the_language_is_rejected(self):
-        self.judges[2].langs = {3: 'GNU C++ 11.2'}
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6}])
-        with self.assertRaises(LanguageNotAvailable):
+        with self.assertRaises(LanguageNotSupported):
             resolve_route(problem, 27, USER)
         self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
 
     def test_entry_without_judge_id_is_rejected(self):
         problem = _problem([{'contest_id': 500, 'problem_id': 6}])
-        with self.assertRaises(LanguageNotAvailable):
+        with self.assertRaises(LanguageNotSupported):
             resolve_route(problem, 27, USER)
 
     def test_string_judge_id(self):
-        self.judges[2].langs = {3: 'GNU C++ 11.2'}
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
         problem = _problem([{'judge_id': '2', 'contest_id': 500, 'problem_id': 6}])
         self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
-        with self.assertRaises(LanguageNotAvailable):
+        with self.assertRaises(LanguageNotSupported):
             resolve_route(problem, 27, USER)
 
     def test_output_only_skips_language_check(self):
-        self.judges[2].langs = {3: 'GNU C++ 11.2'}
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6}],
                            output_only=True)
         self.assertEqual(resolve_route(problem, 0, USER), Route(2, 500, 6))
@@ -71,5 +78,5 @@ class TestResolveRoute(TestCase):
     def test_user_ids_entry_for_another_user_is_rejected(self):
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
                              'user_ids': [USER]}])
-        with self.assertRaises(LanguageNotAvailable):
+        with self.assertRaises(LanguageNotSupported):
             resolve_route(problem, 27, OTHER_USER)

@@ -2,6 +2,7 @@ import datetime
 
 import mock
 
+from rmatics.ejudge.judges_config import JudgeLang
 from rmatics.ejudge.submit_queue.task import submit_task
 from rmatics.model.base import db
 from rmatics.model.run import Run
@@ -200,7 +201,7 @@ class TestSubmitTaskErrors(SubmitTaskTestCase):
         submit_mock.assert_not_called()
 
 
-class TestSubmitTaskLanguageNotAvailable(SubmitTaskTestCase):
+class TestSubmitTaskLanguageNotSupported(SubmitTaskTestCase):
 
     @mock.patch(SUBMIT_PATH)
     def test_language_not_available_is_not_submitted(self, submit_mock):
@@ -219,11 +220,11 @@ class TestSubmitTaskLanguageNotAvailable(SubmitTaskTestCase):
         self.assertEqual(run.ejudge_status,
                          EjudgeStatuses.RMATICS_SUBMIT_ERROR.value)
         self.assertEqual(run.protocol['compiler_output'],
-                         'Язык недоступен для этой задачи')
+                         'Язык не поддерживается для этой задачи')
 
     @mock.patch(SUBMIT_PATH)
     def test_judge_without_the_language_is_not_submitted(self, submit_mock):
-        self.judges[2].langs = {3: 'GNU C++ 11.2'}
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
         problem = self.ejudge_problems[0]
         problem.judges_settings = [
             {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
@@ -233,3 +234,17 @@ class TestSubmitTaskLanguageNotAvailable(SubmitTaskTestCase):
         submit_task.delay(self.run.id)
 
         submit_mock.assert_not_called()
+
+    @mock.patch(SUBMIT_PATH)
+    def test_ejudge_lang_id_comes_from_langs(self, submit_mock):
+        submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 64)}  # lang_map says 62
+        problem = self.ejudge_problems[0]
+        problem.judges_settings = [
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
+        ]
+        db.session.commit()
+
+        submit_task.delay(self.run.id)
+
+        self.assertEqual(submit_mock.call_args[1]['lang_id'], 64)

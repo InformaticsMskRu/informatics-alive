@@ -1,5 +1,6 @@
 from flask import url_for
 
+from rmatics.ejudge.judges_config import JudgeLang
 from rmatics.testutils import TestCase
 
 
@@ -39,9 +40,10 @@ class TestJudges(TestCase):
 
     def test_langs(self):
         self.create_judges()
-        self.judges[2].langs = {27: 'Python 3.9'}
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 62)}
 
         data = self.send_request().json['data']
 
         self.assertIsNone(data['1']['langs'])
-        self.assertEqual(data['2']['langs'], {'27': 'Python 3.9'})
+        self.assertEqual(data['2']['langs'],
+                         {'27': {'name': 'Python 3.9', 'ejudge_lang_id': 62}})

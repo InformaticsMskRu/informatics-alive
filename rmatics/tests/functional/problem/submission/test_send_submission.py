@@ -107,6 +107,8 @@ class TestAPIProblemSubmission(TestCase):
         resp = self.send_request(problem.id, lang_id=1)
 
         self.assert400(resp)
+        self.assertEqual(resp.json['error_code'], 'language_not_supported')
+        self.assertEqual(resp.json['error'], 'Язык не поддерживается для этой задачи')
         self.assertEqual(db.session.query(Run).count(), 0)
 
     def test_statement_allowed_languages(self):
@@ -115,7 +117,10 @@ class TestAPIProblemSubmission(TestCase):
         db.session.commit()
         problem_id = self.ejudge_problems[1].id
 
-        self.assert400(self.send_request(problem_id, lang_id=1, statement_id=statement.id))
+        resp = self.send_request(problem_id, lang_id=1, statement_id=statement.id)
+        self.assert400(resp)
+        self.assertEqual(resp.json['error_code'], 'language_not_allowed')
+        self.assertEqual(resp.json['error'], 'Язык запрещён в этом контесте')
         self.assertEqual(db.session.query(Run).count(), 0)
         self.assert200(self.send_request(problem_id, lang_id=27, statement_id=statement.id))
 

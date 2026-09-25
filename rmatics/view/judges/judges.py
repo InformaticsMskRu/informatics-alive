@@ -17,7 +17,10 @@ class JudgesApi(MethodView):
                 'name': cfg.name,
                 'url': cfg.url,
                 'lang_map': cfg.lang_map,
-                'langs': cfg.langs,
+                'langs': None if cfg.langs is None else {
+                    lang_id: {'name': lang.name, 'ejudge_lang_id': lang.ejudge_lang_id}
+                    for lang_id, lang in cfg.langs.items()
+                },
             }
             for judge_id, cfg in judges.items()
         }
