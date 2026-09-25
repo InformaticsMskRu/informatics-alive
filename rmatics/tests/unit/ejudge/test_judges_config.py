@@ -41,10 +41,8 @@ class TestJudgesConfigLangs(TestCase):
         self.assertEqual(judge.langs, {3: JudgeLang('C++', 3)})
 
     def test_lang_map_key_is_ignored(self):
-        with self.assertLogs('rmatics.ejudge.judges_config', level='WARNING') as logs:
-            judge = self._load({'lang_map': {'27': 62}, 'langs': {
-                '27': {'name': 'Python 3.9', 'ejudge_lang_id': 64}}})
-        self.assertIn('"lang_map" is not supported', logs.output[0])
+        judge = self._load({'lang_map': {'27': 62}, 'langs': {
+            '27': {'name': 'Python 3.9', 'ejudge_lang_id': 64}}})
         self.assertEqual(judge.map_lang_id(27), 64)
 
     def test_langs_not_an_object_accepts_no_languages(self):

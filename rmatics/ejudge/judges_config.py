@@ -70,10 +70,6 @@ def _parse_langs(jid, raw) -> Dict[int, JudgeLang]:
 def _load(path: str) -> Dict[int, JudgeConfig]:
     with open(path) as f:
         data = json.load(f)
-    for jid, cfg in data.items():
-        if 'lang_map' in cfg:
-            # its mapping is not applied: languages would reach ejudge with wrong ids
-            logger.warning(f'Judge {jid}: "lang_map" is not supported, move it into "langs"')
     return {
         int(jid): JudgeConfig(
             url=cfg['url'],

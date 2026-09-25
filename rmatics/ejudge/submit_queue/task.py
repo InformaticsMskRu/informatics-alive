@@ -9,10 +9,10 @@ from rmatics.utils.run import EjudgeStatuses
 
 from rmatics.ejudge.judges_config import get_judge
 from rmatics.ejudge.routing import (  # noqa: F401 (_get_judge_entry is imported by tests)
-    LanguageNotSupported,
     _get_judge_entry,
     resolve_route,
 )
+from rmatics.utils.exceptions import LanguageNotSupported
 from rmatics.ejudge.ejudge_proxy import submit
 
 from rmatics import centrifugo_client
@@ -67,7 +67,7 @@ def submit_task(self, run_id):
     except LanguageNotSupported as e:
         # judges_settings may have changed since the submit was accepted
         # (or the run is being rejudged)
-        logger.error(f'Run #{run_id}: {e.reason}')
+        logger.error(f'Run #{run_id}: {e.description}')
         _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, None)
         run.protocol = _build_submit_error_protocol(run_id, e.description)
         return

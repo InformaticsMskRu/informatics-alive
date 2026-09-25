@@ -13,7 +13,7 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
-from rmatics.ejudge.routing import LanguageNotAllowed, resolve_route
+from rmatics.ejudge.routing import resolve_route
 from rmatics.ejudge.submit_queue.task import (
     submit_task,
 )
@@ -25,6 +25,7 @@ from rmatics.model.problem import Problem, EjudgeProblem
 from rmatics.model.run import Run
 from rmatics.model.statement import Statement
 from rmatics.model.user import SimpleUser
+from rmatics.utils.exceptions import LanguageNotAllowed
 from rmatics.utils.response import jsonify
 from rmatics.view import get_problems_by_statement_id
 from rmatics.view.problem.serializers.problem import ProblemSchema
@@ -100,7 +101,9 @@ class TrustedSubmitApi(MethodView):
         statement = db.session.query(Statement).get(run_statement_id) if run_statement_id else None
         if statement is not None and not problem.output_only and \
                 not statement.is_language_allowed(language_id):
-            raise LanguageNotAllowed()
+            raise LanguageNotAllowed(
+                f'Language {language_id} is not allowed in statement {statement.id}'
+            )
 
         try:
             limit = 64

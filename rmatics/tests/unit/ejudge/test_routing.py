@@ -1,7 +1,8 @@
 from unittest import mock
 
 from rmatics.ejudge.judges_config import JudgeLang
-from rmatics.ejudge.routing import LanguageNotSupported, Route, resolve_route
+from rmatics.ejudge.routing import Route, resolve_route
+from rmatics.utils.exceptions import LanguageNotSupported
 from rmatics.testutils import TestCase
 
 USER = 1

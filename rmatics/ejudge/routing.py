@@ -2,27 +2,11 @@
 from typing import NamedTuple, Optional
 
 from celery.utils.log import get_task_logger
-from werkzeug.exceptions import BadRequest
 
 from rmatics.ejudge.judges_config import get_default_judge_id, get_judge
+from rmatics.utils.exceptions import LanguageNotSupported
 
 logger = get_task_logger(__name__)
-
-
-class LanguageNotSupported(BadRequest):
-    """No judge the problem routes to accepts the language."""
-    error_code = 'language_not_supported'
-    description = 'Язык не поддерживается для этой задачи'
-
-    def __init__(self, reason: str):
-        super().__init__()
-        self.reason = reason  # for logs; description is shown to the user
-
-
-class LanguageNotAllowed(BadRequest):
-    """The statement (contest) doesn't allow the language."""
-    error_code = 'language_not_allowed'
-    description = 'Язык запрещён в этом контесте'
 
 
 class Route(NamedTuple):
@@ -130,8 +114,7 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
         entry = _get_judge_entry(problem, lang_id, user_id)
         if entry is None:
             raise LanguageNotSupported(
-                f'Problem #{problem.id}: no judges_settings entry routes lang_id {lang_id} '
-                f'to a judge that supports it'
+                f'Language {lang_id} is not supported for problem {problem.id}'
             )
         return Route(int(entry['judge_id']), entry['contest_id'], entry['problem_id'])
 
@@ -140,7 +123,6 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
     # output-only answers are plain text, not a language of the judge
     if judge is not None and not problem.output_only and not judge.supports_lang(lang_id):
         raise LanguageNotSupported(
-            f'Problem #{problem.id}: default judge {route.judge_id} does not support '
-            f'lang_id {lang_id}'
+            f'Language {lang_id} is not supported for problem {problem.id}'
         )
     return route

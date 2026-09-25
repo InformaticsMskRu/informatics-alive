@@ -83,7 +83,6 @@ class TestSubmitTaskSuccess(SubmitTaskTestCase):
         с маппингом contest_id/problem_id/lang_id."""
         submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
 
-        self.judges[2].langs = {27: JudgeLang('Python 3.9', 62)}
         problem = self.ejudge_problems[0]
         problem.judges_settings = [
             {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
@@ -221,7 +220,7 @@ class TestSubmitTaskLanguageNotSupported(SubmitTaskTestCase):
         self.assertEqual(run.ejudge_status,
                          EjudgeStatuses.RMATICS_SUBMIT_ERROR.value)
         self.assertEqual(run.protocol['compiler_output'],
-                         'Язык не поддерживается для этой задачи')
+                         f'Language 27 is not supported for problem {problem.id}')
 
     @mock.patch(SUBMIT_PATH)
     def test_judge_without_the_language_is_not_submitted(self, submit_mock):
