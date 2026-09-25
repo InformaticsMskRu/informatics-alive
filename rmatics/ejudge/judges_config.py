@@ -1,8 +1,17 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from flask import Flask, current_app
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class JudgeLang:
+    name: str            # short name with version, e.g. 'Python 3.9'
+    ejudge_lang_id: int  # id of this language inside the judge's ejudge
+
 
 @dataclass
 class JudgeConfig:
@@ -10,13 +19,52 @@ class JudgeConfig:
     name: str = field(default='')
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
-    lang_map: Dict[int, int] = field(default_factory=dict)
+    # rmatics lang_id -> language of the judge: the only languages it accepts
+    langs: Dict[int, JudgeLang] = field(default_factory=dict)
 
     def get_token(self) -> Optional[str]:
         return self.token
 
+    def supports_lang(self, lang_id: int) -> bool:
+        return lang_id in self.langs
+
     def map_lang_id(self, lang_id: int) -> int:
-        return self.lang_map.get(lang_id, lang_id)
+        if lang_id not in self.langs:
+            # routing (resolve_route) only lets supported languages through
+            raise ValueError(f'lang_id {lang_id} is not in the judge langs')
+        return self.langs[lang_id].ejudge_lang_id
+
+
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _parse_langs(jid, raw) -> Dict[int, JudgeLang]:
+    """{"<lang_id>": {"name": <str>, "ejudge_lang_id": <int>}}; invalid
+    entries are skipped with a warning. A judge without valid "langs"
+    accepts no languages."""
+    if not isinstance(raw, dict):
+        logger.error(f'Judge {jid}: "langs" is missing or not an object, '
+                     f'the judge accepts no languages')
+        return {}
+
+    langs = {}
+    for lang_id, lang in raw.items():
+        try:
+            lang_id = int(lang_id)
+        except (TypeError, ValueError):
+            logger.warning(f'Judge {jid}: invalid lang_id {lang_id!r} in "langs", skipping')
+            continue
+        name = lang.get('name') if isinstance(lang, dict) else None
+        ejudge_lang_id = lang.get('ejudge_lang_id') if isinstance(lang, dict) else None
+        if not isinstance(name, str) or not name.strip() or not _is_int(ejudge_lang_id):
+            logger.warning(
+                f'Judge {jid}: lang_id {lang_id} in "langs" needs "name" and an integer '
+                f'"ejudge_lang_id", skipping: {lang!r}'
+            )
+            continue
+        langs[lang_id] = JudgeLang(name=name.strip(), ejudge_lang_id=ejudge_lang_id)
+    return langs
 
 
 def _load(path: str) -> Dict[int, JudgeConfig]:
@@ -28,7 +76,7 @@ def _load(path: str) -> Dict[int, JudgeConfig]:
             name=cfg.get('name', ''),
             token=cfg.get('token'),
             sender_user_id=cfg.get('sender_user_id', 5),
-            lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()}
+            langs=_parse_langs(jid, cfg.get('langs')),
         )
         for jid, cfg in data.items()
     }
@@ -76,8 +124,11 @@ def init_app(app: Flask) -> None:
 
 
 def get_default_judge_id() -> Optional[int]:
-    raw = current_app.config.get('DEFAULT_JUDGE_ID')
-    return int(raw) if raw is not None else None
+    # an invalid value is already reported by init_app
+    try:
+        return int(current_app.config.get('DEFAULT_JUDGE_ID'))
+    except (TypeError, ValueError):
+        return None
 
 def get_judge(judge_id: int) -> Optional[JudgeConfig]:
     return current_app.extensions.get('judges', {}).get(judge_id)

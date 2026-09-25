@@ -7,74 +7,18 @@ from rmatics.model.base import db
 from sqlalchemy.orm import joinedload
 from rmatics.utils.run import EjudgeStatuses
 
-from rmatics.ejudge.judges_config import get_judge, get_default_judge_id
+from rmatics.ejudge.judges_config import get_judge
+from rmatics.ejudge.routing import (  # noqa: F401 (_get_judge_entry is imported by tests)
+    _get_judge_entry,
+    resolve_route,
+)
+from rmatics.utils.constants import OUTPUT_ONLY_LANG_ID
+from rmatics.utils.exceptions import LanguageNotSupported
 from rmatics.ejudge.ejudge_proxy import submit
 
 from rmatics import centrifugo_client
 
 logger = get_task_logger(__name__)
-
-_REQUIRED_ENTRY_KEYS = ('contest_id', 'problem_id')
-
-
-def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
-    """Return the highest-priority matching judges_settings entry for (lang_id, user_id).
-
-    judges_settings is a list of entries:
-      {
-        "judge_id":  <str>,    # optional — references a judge in judges.json
-        "contest_id": <int>,   # required — contest_id inside that ejudge
-        "problem_id": <int>,   # required — prob_id inside the contest
-        "lang_ids":  [<int>],  # null / absent matches any language
-        "user_ids":  [<int>]   # null / absent matches any moodle user
-      }
-
-    An entry is a candidate when BOTH filters match:
-      - lang_ids is null  OR  lang_id  in lang_ids
-      - user_ids is null  OR  user_id  in user_ids
-
-    judges_settings entry shape:
-      {
-        "judge_id":  <int>,    # optional — references a judge in judges.json by numeric id
-        "contest_id": <int>,   # required
-        "problem_id": <int>,   # required
-        "lang_ids":  [<int>],  # null / absent matches any language
-        "user_ids":  [<int>]   # null / absent matches any moodle user
-      }
-
-    Entries missing contest_id or problem_id are skipped with a warning.
-    Among valid candidates, higher specificity (more filters set) wins;
-    listed order breaks ties. Returns None when no entry matches.
-    """
-    settings = problem.judges_settings
-    if not settings:
-        return None
-
-    candidates = []
-    for entry in settings:
-        missing = [k for k in _REQUIRED_ENTRY_KEYS if k not in entry]
-        if missing:
-            logger.warning(
-                f'Problem #{problem.id}: judges_settings entry missing required keys '
-                f'{missing!r}, skipping: {entry!r}'
-            )
-            continue
-        lang_ids = entry.get('lang_ids')
-        user_ids = entry.get('user_ids')
-        if (lang_ids is None or lang_id in lang_ids) and \
-           (user_ids is None or user_id in user_ids):
-            candidates.append(entry)
-
-    if not candidates:
-        return None
-
-    candidates.sort(
-        key=lambda e: -(
-            (e.get('lang_ids') is not None) +
-            (e.get('user_ids') is not None)
-        )
-    )
-    return candidates[0]
 
 def _get_run(run_id) -> Optional[Run]:
     run: Run = db.session.query(Run) \
@@ -119,19 +63,15 @@ def submit_task(self, run_id):
 
     centrifugo_client.send_problem_run_updates(run.problem_id, run)
 
-    entry = _get_judge_entry(problem, run.lang_id, run.user_id)
-
-    if entry is not None:
-        judge_id = entry.get('judge_id')
-        contest_id = entry['contest_id']
-        prob_id = entry['problem_id']
-    else:
-        judge_id = get_default_judge_id()
-        contest_id = problem.ejudge_contest_id
-        prob_id = problem.problem_id
-
-    if judge_id is None:
-        judge_id = get_default_judge_id()
+    try:
+        judge_id, contest_id, prob_id = resolve_route(problem, run.lang_id, run.user_id)
+    except LanguageNotSupported as e:
+        # judges_settings may have changed since the submit was accepted
+        # (or the run is being rejudged)
+        logger.error(f'Run #{run_id}: {e.description}')
+        _add_info_from_ejudge(run, None, None, EjudgeStatuses.RMATICS_SUBMIT_ERROR, None)
+        run.protocol = _build_submit_error_protocol(run_id, e.description)
+        return
 
     if judge_id is None:
         logger.error(
@@ -149,7 +89,9 @@ def submit_task(self, run_id):
     entry_url = judge.url
     entry_token = judge.get_token()
     sender_user_id = judge.sender_user_id
-    lang_id = judge.map_lang_id(run.lang_id)
+    # output-only answers are plain text, not a language of the judge; runs
+    # stored before the submit normalized their lang_id may have another one
+    lang_id = OUTPUT_ONLY_LANG_ID if problem.output_only else judge.map_lang_id(run.lang_id)
 
     file = run.source
 

@@ -57,6 +57,9 @@ def create_app(config=None, config_logger=True):
 def init_logger():
     dictConfig({
         'version': 1,
+        # module loggers (logging.getLogger(__name__)) are created on import,
+        # before this runs: keep them working
+        'disable_existing_loggers': False,
         'formatters': {'default': {
             'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
         }},

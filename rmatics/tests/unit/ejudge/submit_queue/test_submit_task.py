@@ -2,6 +2,7 @@ import datetime
 
 import mock
 
+from rmatics.ejudge.judges_config import JudgeLang
 from rmatics.ejudge.submit_queue.task import submit_task
 from rmatics.model.base import db
 from rmatics.model.run import Run
@@ -94,7 +95,7 @@ class TestSubmitTaskSuccess(SubmitTaskTestCase):
             run_file=b'source',
             contest_id=500,
             prob_id=6,
-            lang_id=62,  # judges[2].lang_map: 27 -> 62
+            lang_id=62,  # judges[2].langs: 27 -> 62
             filename='common_filename',
             url=self.judges[2].url,
             sender_user_id=7,
@@ -198,3 +199,70 @@ class TestSubmitTaskErrors(SubmitTaskTestCase):
 
         submit_task.delay(self.run.id)
         submit_mock.assert_not_called()
+
+
+class TestSubmitTaskLanguageNotSupported(SubmitTaskTestCase):
+
+    @mock.patch(SUBMIT_PATH)
+    def test_language_not_available_is_not_submitted(self, submit_mock):
+        """judges_settings without a matching entry: the run fails instead of
+        going to the default judge."""
+        problem = self.ejudge_problems[0]
+        problem.judges_settings = [
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6, 'lang_ids': [3]},
+        ]
+        db.session.commit()
+
+        submit_task.delay(self.run.id)
+
+        submit_mock.assert_not_called()
+        run = db.session.query(Run).get(self.run.id)
+        self.assertEqual(run.ejudge_status,
+                         EjudgeStatuses.RMATICS_SUBMIT_ERROR.value)
+        self.assertEqual(run.protocol['compiler_output'],
+                         f'Language 27 is not supported for problem {problem.id}')
+
+    @mock.patch(SUBMIT_PATH)
+    def test_judge_without_the_language_is_not_submitted(self, submit_mock):
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        problem = self.ejudge_problems[0]
+        problem.judges_settings = [
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
+        ]
+        db.session.commit()
+
+        submit_task.delay(self.run.id)
+
+        submit_mock.assert_not_called()
+
+    @mock.patch(SUBMIT_PATH)
+    def test_ejudge_lang_id_comes_from_langs(self, submit_mock):
+        submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 64)}
+        problem = self.ejudge_problems[0]
+        problem.judges_settings = [
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
+        ]
+        db.session.commit()
+
+        submit_task.delay(self.run.id)
+
+        self.assertEqual(submit_mock.call_args[1]['lang_id'], 64)
+
+    @mock.patch(SUBMIT_PATH)
+    def test_output_only_sends_lang_id_0(self, submit_mock):
+        """Even for a run stored with another lang_id (before the submit
+        normalized it)."""
+        submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 62)}
+        problem = self.ejudge_problems[0]
+        problem.output_only = True
+        problem.judges_settings = [
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
+        ]
+        db.session.commit()
+        run = self._make_run(lang_id=3)
+
+        submit_task.delay(run.id)
+
+        self.assertEqual(submit_mock.call_args[1]['lang_id'], 0)

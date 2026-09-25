@@ -8,7 +8,6 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from rmatics.model.base import db
 from rmatics.model.course_module import CourseModuleInstance
-from rmatics.utils.constants import LANG_NAME_BY_ID
 
 from rmatics.utils.functions import attrs_to_dict
 from rmatics.utils.json_type import JsonType
@@ -52,9 +51,11 @@ class Statement(CourseModuleInstance, db.Model):
             'allowed_languages': {
                 'type': 'array',
                 'uniqueItems': True,
+                # rmatics lang_ids; the judges (judges.json "langs") define
+                # which ones exist, so they aren't enumerated here
                 'items': {
                     'type': 'integer',
-                    'enum': list(LANG_NAME_BY_ID.keys()),
+                    'minimum': 0,
                 }
             },
             'type': {
@@ -113,6 +114,11 @@ class Statement(CourseModuleInstance, db.Model):
         if not (self.settings and 'allowed_languages' in self.settings):
             return None
         return self.settings['allowed_languages']
+
+    def is_language_allowed(self, lang_id: int) -> bool:
+        # an empty list is treated as "not set", not as "nothing allowed"
+        allowed = self.get_allowed_languages()
+        return not allowed or lang_id in allowed
 
     def set_settings(self, settings):
         validation_error = next(self.SETTINGS_SCHEMA_VALIDATOR.iter_errors(settings), None)

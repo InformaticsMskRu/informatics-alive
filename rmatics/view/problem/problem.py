@@ -13,6 +13,7 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
+from rmatics.ejudge.routing import resolve_route
 from rmatics.ejudge.submit_queue.task import (
     submit_task,
 )
@@ -22,7 +23,10 @@ from rmatics.model.base import db
 from rmatics.model.group import UserGroup
 from rmatics.model.problem import Problem, EjudgeProblem
 from rmatics.model.run import Run
+from rmatics.model.statement import Statement
 from rmatics.model.user import SimpleUser
+from rmatics.utils.constants import OUTPUT_ONLY_LANG_ID
+from rmatics.utils.exceptions import LanguageNotAllowed
 from rmatics.utils.response import jsonify
 from rmatics.view import get_problems_by_statement_id
 from rmatics.view.problem.serializers.problem import ProblemSchema
@@ -87,6 +91,25 @@ class TrustedSubmitApi(MethodView):
 
         if int(user_id) <= 0:
             raise BadRequest('Wrong user status')
+
+        # Moodle's upload widget sends its default lang_id (3) unless the
+        # user picks "Текстовый файл", so the client's value isn't reliable
+        if problem.output_only:
+            language_id = OUTPUT_ONLY_LANG_ID
+
+        resolve_route(problem, language_id, user_id)
+
+        # The statement's allowed_languages is a policy of the context the
+        # run is submitted in: checked here only, not again on rejudge.
+        # context_id replaces statement_id on the run (see below).
+        # Output-only answers are plain text, not a language.
+        run_statement_id = context_id or statement_id
+        statement = db.session.query(Statement).get(run_statement_id) if run_statement_id else None
+        if statement is not None and not problem.output_only and \
+                not statement.is_language_allowed(language_id):
+            raise LanguageNotAllowed(
+                f'Language {language_id} is not allowed in statement {statement.id}'
+            )
 
         try:
             limit = 64

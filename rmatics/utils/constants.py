@@ -1,3 +1,7 @@
+# lang_id of an output-only problem's answer ("Текстовый файл" in Moodle):
+# a text file, not a program in some language
+OUTPUT_ONLY_LANG_ID = 0
+
 LANG_NAME_BY_ID = {
     1: 'Free Pascal 2.6.2',
     2: 'GNU C 4.9',
