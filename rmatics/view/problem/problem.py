@@ -25,6 +25,7 @@ from rmatics.model.problem import Problem, EjudgeProblem
 from rmatics.model.run import Run
 from rmatics.model.statement import Statement
 from rmatics.model.user import SimpleUser
+from rmatics.utils.constants import OUTPUT_ONLY_LANG_ID
 from rmatics.utils.exceptions import LanguageNotAllowed
 from rmatics.utils.response import jsonify
 from rmatics.view import get_problems_by_statement_id
@@ -90,6 +91,11 @@ class TrustedSubmitApi(MethodView):
 
         if int(user_id) <= 0:
             raise BadRequest('Wrong user status')
+
+        # Moodle's upload widget sends its default lang_id (3) unless the
+        # user picks "Текстовый файл", so the client's value isn't reliable
+        if problem.output_only:
+            language_id = OUTPUT_ONLY_LANG_ID
 
         resolve_route(problem, language_id, user_id)
 

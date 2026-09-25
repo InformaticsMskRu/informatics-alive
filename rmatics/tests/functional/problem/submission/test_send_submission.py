@@ -154,3 +154,14 @@ class TestAPIProblemSubmission(TestCase):
         resp = self.send_request(problem.id, lang_id=0, statement_id=statement.id)
 
         self.assert200(resp)
+
+    def test_output_only_lang_id_is_stored_as_0(self):
+        problem = self.ejudge_problems[1]
+        problem.output_only = True
+        db.session.commit()
+
+        resp = self.send_request(problem.id, lang_id=3)
+
+        self.assert200(resp)
+        run = db.session.query(Run).get(resp.json['data']['run_id'])
+        self.assertEqual(run.lang_id, 0)
