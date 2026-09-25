@@ -41,10 +41,15 @@ class TestResolveRoute(TestCase):
             resolve_route(problem, 27, USER)
         self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
 
-    def test_entry_without_judge_id_uses_default_judge_langs(self):
-        self.judges[1].langs = {3: 'GNU C++ 11.2'}
+    def test_entry_without_judge_id_is_rejected(self):
         problem = _problem([{'contest_id': 500, 'problem_id': 6}])
-        self.assertEqual(resolve_route(problem, 3, USER), Route(1, 500, 6))
+        with self.assertRaises(LanguageNotAvailable):
+            resolve_route(problem, 27, USER)
+
+    def test_string_judge_id(self):
+        self.judges[2].langs = {3: 'GNU C++ 11.2'}
+        problem = _problem([{'judge_id': '2', 'contest_id': 500, 'problem_id': 6}])
+        self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
         with self.assertRaises(LanguageNotAvailable):
             resolve_route(problem, 27, USER)
 

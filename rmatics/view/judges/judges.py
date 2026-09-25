@@ -1,7 +1,6 @@
 from flask import current_app
 from flask.views import MethodView
 
-from rmatics.ejudge.judges_config import get_default_judge_id
 from rmatics.utils.response import jsonify
 
 
@@ -13,14 +12,12 @@ class JudgesApi(MethodView):
     """
     def get(self):
         judges = current_app.extensions.get('judges', {})
-        default_judge_id = get_default_judge_id()
         data = {
             str(judge_id): {
                 'name': cfg.name,
                 'url': cfg.url,
                 'lang_map': cfg.lang_map,
                 'langs': cfg.langs,
-                'is_default': judge_id == default_judge_id,
             }
             for judge_id, cfg in judges.items()
         }

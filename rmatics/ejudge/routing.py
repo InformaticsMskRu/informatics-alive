@@ -21,7 +21,7 @@ class Route(NamedTuple):
     prob_id: int
 
 
-_REQUIRED_ENTRY_KEYS = ('contest_id', 'problem_id')
+_REQUIRED_ENTRY_KEYS = ('judge_id', 'contest_id', 'problem_id')
 
 
 def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
@@ -29,7 +29,7 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
 
     judges_settings is a list of entries:
       {
-        "judge_id":  <str>,    # optional — references a judge in judges.json
+        "judge_id":  <int>,    # required — references a judge in judges.json
         "contest_id": <int>,   # required — contest_id inside that ejudge
         "problem_id": <int>,   # required — prob_id inside the contest
         "lang_ids":  [<int>],  # null / absent matches any language
@@ -40,16 +40,8 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
       - lang_ids is null  OR  lang_id  in lang_ids
       - user_ids is null  OR  user_id  in user_ids
 
-    judges_settings entry shape:
-      {
-        "judge_id":  <int>,    # optional — references a judge in judges.json by numeric id
-        "contest_id": <int>,   # required
-        "problem_id": <int>,   # required
-        "lang_ids":  [<int>],  # null / absent matches any language
-        "user_ids":  [<int>]   # null / absent matches any moodle user
-      }
-
-    Entries missing contest_id or problem_id are skipped with a warning.
+    Entries missing a required key, or with a non-integer judge_id, are
+    skipped with a warning.
     Among valid candidates, higher specificity (more filters set) wins;
     listed order breaks ties. Returns None when no entry matches.
     """
@@ -64,6 +56,14 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
             logger.warning(
                 f'Problem #{problem.id}: judges_settings entry missing required keys '
                 f'{missing!r}, skipping: {entry!r}'
+            )
+            continue
+        try:
+            int(entry['judge_id'])
+        except (TypeError, ValueError):
+            logger.warning(
+                f'Problem #{problem.id}: judges_settings entry with invalid judge_id, '
+                f'skipping: {entry!r}'
             )
             continue
         lang_ids = entry.get('lang_ids')
@@ -92,8 +92,9 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
     LanguageNotAvailable is raised instead of falling back to the default
     judge. Problems without judges_settings always go to the default judge.
 
-    judge_id may be None (no DEFAULT_JUDGE_ID) and may be unknown to the
-    config: reporting that is up to the caller.
+    judge_id may be None (a problem without judges_settings and no
+    DEFAULT_JUDGE_ID) and may be unknown to the config: reporting that is up
+    to the caller.
     """
     entry = _get_judge_entry(problem, lang_id, user_id)
 
@@ -104,10 +105,7 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
             )
         return Route(get_default_judge_id(), problem.ejudge_contest_id, problem.problem_id)
 
-    judge_id = entry.get('judge_id')
-    if judge_id is None:
-        judge_id = get_default_judge_id()
-
+    judge_id = int(entry['judge_id'])
     judge = get_judge(judge_id)
     # output-only answers are plain text, not a language of the judge
     if judge is not None and not problem.output_only and not judge.supports_lang(lang_id):

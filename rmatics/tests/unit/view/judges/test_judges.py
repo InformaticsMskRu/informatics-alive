@@ -37,13 +37,11 @@ class TestJudges(TestCase):
         self.assert200(resp)
         self.assertEqual(resp.json['data'], {})
 
-    def test_langs_and_default_flag(self):
-        self.create_judges()  # DEFAULT_JUDGE_ID = 1
+    def test_langs(self):
+        self.create_judges()
         self.judges[2].langs = {27: 'Python 3.9'}
 
         data = self.send_request().json['data']
 
         self.assertIsNone(data['1']['langs'])
         self.assertEqual(data['2']['langs'], {'27': 'Python 3.9'})
-        self.assertTrue(data['1']['is_default'])
-        self.assertFalse(data['2']['is_default'])
