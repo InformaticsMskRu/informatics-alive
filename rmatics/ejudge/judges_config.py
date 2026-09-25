@@ -19,10 +19,8 @@ class JudgeConfig:
     name: str = field(default='')
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
-    # Deprecated: ignored when langs is declared
-    lang_map: Dict[int, int] = field(default_factory=dict)
     # rmatics lang_id -> language of the judge. None: the judge doesn't
-    # declare its languages (no language check, lang_map/identity mapping).
+    # declare its languages (no language check, lang_ids sent as is).
     langs: Optional[Dict[int, JudgeLang]] = field(default=None)
 
     def get_token(self) -> Optional[str]:
@@ -37,7 +35,7 @@ class JudgeConfig:
                 # routing (resolve_route) only lets supported languages through
                 raise ValueError(f'lang_id {lang_id} is not in the judge langs')
             return self.langs[lang_id].ejudge_lang_id
-        return self.lang_map.get(lang_id, lang_id)
+        return lang_id
 
 
 def _is_int(value) -> bool:
@@ -75,13 +73,16 @@ def _parse_langs(jid, raw) -> Optional[Dict[int, JudgeLang]]:
 def _load(path: str) -> Dict[int, JudgeConfig]:
     with open(path) as f:
         data = json.load(f)
+    for jid, cfg in data.items():
+        if 'lang_map' in cfg:
+            # its mapping is not applied: languages would reach ejudge with wrong ids
+            logger.warning(f'Judge {jid}: "lang_map" is not supported, move it into "langs"')
     return {
         int(jid): JudgeConfig(
             url=cfg['url'],
             name=cfg.get('name', ''),
             token=cfg.get('token'),
             sender_user_id=cfg.get('sender_user_id', 5),
-            lang_map={int(k): v for k, v in cfg.get('lang_map', {}).items()},
             langs=_parse_langs(jid, cfg.get('langs')),
         )
         for jid, cfg in data.items()
@@ -93,12 +94,6 @@ def _validate(app: Flask, judges: Dict[int, JudgeConfig]) -> bool:
         if judge.token is None:
             app.logger.error(f'No token provided for judge {jid}')
             return False
-        if judge.lang_map and judge.langs is not None:
-            app.logger.warning(f'Judge {jid}: "lang_map" is ignored because "langs" is declared')
-        elif judge.lang_map:
-            app.logger.warning(
-                f'Judge {jid}: "lang_map" is deprecated, describe the languages in "langs"'
-            )
     
     return True
 

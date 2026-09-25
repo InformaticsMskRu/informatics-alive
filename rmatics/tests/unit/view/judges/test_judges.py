@@ -21,7 +21,6 @@ class TestJudges(TestCase):
         self.assertEqual(set(data.keys()), {'1', '2'})
         self.assertEqual(data['2']['name'], 'second-ejudge')
         self.assertEqual(data['2']['url'], 'http://ejudge-2/cgi-bin/new-client')
-        self.assertEqual(data['2']['lang_map'], {'27': 62})
 
     def test_secret_fields_are_not_exposed(self):
         self.create_judges()

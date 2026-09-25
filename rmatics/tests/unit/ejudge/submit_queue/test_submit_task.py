@@ -83,6 +83,7 @@ class TestSubmitTaskSuccess(SubmitTaskTestCase):
         с маппингом contest_id/problem_id/lang_id."""
         submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
 
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 62)}
         problem = self.ejudge_problems[0]
         problem.judges_settings = [
             {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
@@ -95,7 +96,7 @@ class TestSubmitTaskSuccess(SubmitTaskTestCase):
             run_file=b'source',
             contest_id=500,
             prob_id=6,
-            lang_id=62,  # judges[2].lang_map: 27 -> 62
+            lang_id=62,  # judges[2].langs: 27 -> 62
             filename='common_filename',
             url=self.judges[2].url,
             sender_user_id=7,
@@ -238,7 +239,7 @@ class TestSubmitTaskLanguageNotSupported(SubmitTaskTestCase):
     @mock.patch(SUBMIT_PATH)
     def test_ejudge_lang_id_comes_from_langs(self, submit_mock):
         submit_mock.return_value = {'code': 0, 'run_id': 1, 'run_uuid': 'u'}
-        self.judges[2].langs = {27: JudgeLang('Python 3.9', 64)}  # lang_map says 62
+        self.judges[2].langs = {27: JudgeLang('Python 3.9', 64)}
         problem = self.ejudge_problems[0]
         problem.judges_settings = [
             {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},

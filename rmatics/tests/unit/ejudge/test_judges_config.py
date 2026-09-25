@@ -37,6 +37,10 @@ class TestJudgesConfigLangs(TestCase):
         }})
         self.assertEqual(judge.langs, {3: JudgeLang('C++', 3)})
 
+    def test_lang_map_key_is_ignored(self):
+        judge = self._load({'lang_map': {'27': 62}})
+        self.assertEqual(judge.map_lang_id(27), 27)
+
     def test_langs_not_an_object_is_ignored(self):
         self.assertIsNone(self._load({'langs': ['Python 3.9']}).langs)
 
@@ -52,20 +56,14 @@ class TestMapLangId(TestCase):
         judge = JudgeConfig(url='u', langs={27: JudgeLang('Python 3.9', 62)})
         self.assertEqual(judge.map_lang_id(27), 62)
 
-    def test_lang_map_is_ignored_when_langs_declared(self):
-        judge = JudgeConfig(url='u', lang_map={27: 99},
-                            langs={27: JudgeLang('Python 3.9', 62)})
-        self.assertEqual(judge.map_lang_id(27), 62)
-
     def test_lang_outside_langs_raises(self):
-        judge = JudgeConfig(url='u', lang_map={3: 99}, langs={27: JudgeLang('Python 3.9', 62)})
+        judge = JudgeConfig(url='u', langs={27: JudgeLang('Python 3.9', 62)})
         with self.assertRaises(ValueError):
             judge.map_lang_id(3)
 
-    def test_lang_map_without_langs(self):
-        judge = JudgeConfig(url='u', lang_map={27: 62})
-        self.assertEqual(judge.map_lang_id(27), 62)
-        self.assertEqual(judge.map_lang_id(3), 3)
+    def test_without_langs_ids_are_sent_as_is(self):
+        self.assertEqual(JudgeConfig(url='u').map_lang_id(27), 27)
+
 
 
 class TestDefaultJudgeId(TestCase):

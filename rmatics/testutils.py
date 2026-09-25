@@ -205,7 +205,7 @@ class TestCase(flask_testing.TestCase):
                            name='new-ejudge', token='token-1'),
             2: JudgeConfig(url='http://ejudge-2/cgi-bin/new-client',
                            name='second-ejudge', token='token-2',
-                           sender_user_id=7, lang_map={27: 62}),
+                           sender_user_id=7),
         }
         self.app.extensions['judges'] = self.judges
         self.app.config['DEFAULT_JUDGE_ID'] = 1
