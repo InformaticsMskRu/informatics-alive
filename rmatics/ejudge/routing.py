@@ -34,8 +34,12 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
       - lang_ids is null  OR  lang_id  in lang_ids
       - user_ids is null  OR  user_id  in user_ids
       - its judge has lang_id in its langs; lang_ids can only narrow the
-        judge's languages down. Not checked for output-only problems, nor
-        for a judge missing from the config (the caller reports that).
+        judge's languages down. Not checked for a judge missing from the
+        config (the caller reports that).
+
+    Languages don't apply to output-only problems (the answer is a text
+    file): lang_ids and the judge's langs are ignored for them, so only
+    user_ids, specificity and listed order choose the entry.
 
     Entries missing a required key, or with a non-integer judge_id, are
     skipped with a warning.
@@ -45,6 +49,10 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
     settings = problem.judges_settings
     if not settings:
         return None
+
+    # lang_ids of an entry, as far as routing is concerned
+    def entry_lang_ids(entry):
+        return None if problem.output_only else entry.get('lang_ids')
 
     candidates = []
     for entry in settings:
@@ -63,7 +71,7 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
                 f'skipping: {entry!r}'
             )
             continue
-        lang_ids = entry.get('lang_ids')
+        lang_ids = entry_lang_ids(entry)
         user_ids = entry.get('user_ids')
         if (lang_ids is None or lang_id in lang_ids) and \
            (user_ids is None or user_id in user_ids) and \
@@ -75,7 +83,7 @@ def _get_judge_entry(problem, lang_id: int, user_id: int) -> Optional[dict]:
 
     candidates.sort(
         key=lambda e: -(
-            (e.get('lang_ids') is not None) +
+            (entry_lang_ids(e) is not None) +
             (e.get('user_ids') is not None)
         )
     )

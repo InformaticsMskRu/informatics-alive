@@ -101,6 +101,27 @@ class TestResolveRoute(TestCase):
                            output_only=True)
         self.assertEqual(resolve_route(problem, 0, USER), Route(2, 500, 6))
 
+    def test_output_only_ignores_lang_ids(self):
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
+                             'lang_ids': [3]}], output_only=True)
+        self.assertEqual(resolve_route(problem, 0, USER), Route(2, 500, 6))
+
+    def test_output_only_lang_ids_add_no_specificity(self):
+        # without lang_ids counting, both entries are equally specific:
+        # the first listed wins
+        problem = _problem([
+            {'judge_id': 1, 'contest_id': 700, 'problem_id': 1},
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6, 'lang_ids': [0]},
+        ], output_only=True)
+        self.assertEqual(resolve_route(problem, 0, USER), Route(1, 700, 1))
+
+    def test_output_only_keeps_user_ids(self):
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
+                             'user_ids': [USER]}], output_only=True)
+        self.assertEqual(resolve_route(problem, 0, USER), Route(2, 500, 6))
+        with self.assertRaises(LanguageNotSupported):
+            resolve_route(problem, 0, OTHER_USER)
+
     def test_unknown_judge_is_left_to_the_caller(self):
         problem = _problem([{'judge_id': 99, 'contest_id': 500, 'problem_id': 6}])
         self.assertEqual(resolve_route(problem, 27, USER), Route(99, 500, 6))
