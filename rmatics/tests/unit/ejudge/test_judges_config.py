@@ -15,8 +15,11 @@ class TestJudgesConfigLangs(TestCase):
             json.dump({'5': cfg}, f)
         return _load(path)[5]
 
-    def test_langs_absent(self):
-        self.assertIsNone(self._load({}).langs)
+    def test_langs_absent_accepts_no_languages(self):
+        with self.assertLogs('rmatics.ejudge.judges_config', level='ERROR'):
+            judge = self._load({})
+        self.assertEqual(judge.langs, {})
+        self.assertFalse(judge.supports_lang(27))
 
     def test_langs_parsed(self):
         judge = self._load({'langs': {
@@ -38,14 +41,18 @@ class TestJudgesConfigLangs(TestCase):
         self.assertEqual(judge.langs, {3: JudgeLang('C++', 3)})
 
     def test_lang_map_key_is_ignored(self):
-        judge = self._load({'lang_map': {'27': 62}})
-        self.assertEqual(judge.map_lang_id(27), 27)
+        with self.assertLogs('rmatics.ejudge.judges_config', level='WARNING') as logs:
+            judge = self._load({'lang_map': {'27': 62}, 'langs': {
+                '27': {'name': 'Python 3.9', 'ejudge_lang_id': 64}}})
+        self.assertIn('"lang_map" is not supported', logs.output[0])
+        self.assertEqual(judge.map_lang_id(27), 64)
 
-    def test_langs_not_an_object_is_ignored(self):
-        self.assertIsNone(self._load({'langs': ['Python 3.9']}).langs)
+    def test_langs_not_an_object_accepts_no_languages(self):
+        with self.assertLogs('rmatics.ejudge.judges_config', level='ERROR'):
+            self.assertEqual(self._load({'langs': ['Python 3.9']}).langs, {})
 
     def test_supports_lang(self):
-        self.assertTrue(JudgeConfig(url='u').supports_lang(27))
+        self.assertFalse(JudgeConfig(url='u').supports_lang(27))
         judge = JudgeConfig(url='u', langs={3: JudgeLang('C++', 3)})
         self.assertTrue(judge.supports_lang(3))
         self.assertFalse(judge.supports_lang(27))
@@ -61,8 +68,6 @@ class TestMapLangId(TestCase):
         with self.assertRaises(ValueError):
             judge.map_lang_id(3)
 
-    def test_without_langs_ids_are_sent_as_is(self):
-        self.assertEqual(JudgeConfig(url='u').map_lang_id(27), 27)
 
 
 

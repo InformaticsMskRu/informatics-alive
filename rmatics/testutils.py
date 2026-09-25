@@ -199,13 +199,21 @@ class TestCase(flask_testing.TestCase):
 
     def create_judges(self):
         """Конфигурация judges (judges.json) + DEFAULT_JUDGE_ID для тестов."""
-        from rmatics.ejudge.judges_config import JudgeConfig
+        from rmatics.ejudge.judges_config import JudgeConfig, JudgeLang
+
+        def langs():
+            return {
+                1: JudgeLang('Free Pascal 3.0', 1),
+                3: JudgeLang('GNU C++ 11.2', 3),
+                27: JudgeLang('Python 3.9', 27),
+            }
+
         self.judges = {
             1: JudgeConfig(url='http://ejudge-1/cgi-bin/new-client',
-                           name='new-ejudge', token='token-1'),
+                           name='new-ejudge', token='token-1', langs=langs()),
             2: JudgeConfig(url='http://ejudge-2/cgi-bin/new-client',
                            name='second-ejudge', token='token-2',
-                           sender_user_id=7),
+                           sender_user_id=7, langs=langs()),
         }
         self.app.extensions['judges'] = self.judges
         self.app.config['DEFAULT_JUDGE_ID'] = 1

@@ -48,6 +48,40 @@ class TestResolveRoute(TestCase):
             resolve_route(problem, 27, USER)
         self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
 
+    def test_falls_through_to_an_entry_whose_judge_supports_the_language(self):
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        self.judges[1].langs = {71: JudgeLang('Kotlin 1.9', 71)}
+        problem = _problem([
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6},
+            {'judge_id': 1, 'contest_id': 700, 'problem_id': 1},
+        ])
+        self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
+        self.assertEqual(resolve_route(problem, 71, USER), Route(1, 700, 1))
+        with self.assertRaises(LanguageNotSupported):
+            resolve_route(problem, 27, USER)
+
+    def test_lang_ids_narrow_the_judge_languages(self):
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3),
+                                27: JudgeLang('Python 3.9', 62)}
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
+                             'lang_ids': [3]}])
+        self.assertEqual(resolve_route(problem, 3, USER), Route(2, 500, 6))
+        with self.assertRaises(LanguageNotSupported):
+            resolve_route(problem, 27, USER)
+
+    def test_lang_ids_cannot_add_a_language_to_the_judge(self):
+        """lang_ids lists a language the judge lacks: the more specific entry
+        is passed over (with a warning) for one whose judge supports it."""
+        self.judges[2].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        self.judges[1].langs = {27: JudgeLang('Python 3.9', 27)}
+        problem = _problem([
+            {'judge_id': 2, 'contest_id': 500, 'problem_id': 6, 'lang_ids': [27]},
+            {'judge_id': 1, 'contest_id': 700, 'problem_id': 1},
+        ])
+        with self.assertLogs('rmatics.ejudge.routing', level='WARNING') as logs:
+            self.assertEqual(resolve_route(problem, 27, USER), Route(1, 700, 1))
+        self.assertIn('lang_ids lists lang_id 27', logs.output[0])
+
     def test_entry_without_judge_id_is_rejected(self):
         problem = _problem([{'contest_id': 500, 'problem_id': 6}])
         with self.assertRaises(LanguageNotSupported):

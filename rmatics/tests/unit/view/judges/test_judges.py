@@ -43,6 +43,6 @@ class TestJudges(TestCase):
 
         data = self.send_request().json['data']
 
-        self.assertIsNone(data['1']['langs'])
+        self.assertEqual(data['1']['langs']['3'], {'name': 'GNU C++ 11.2', 'ejudge_lang_id': 3})
         self.assertEqual(data['2']['langs'],
                          {'27': {'name': 'Python 3.9', 'ejudge_lang_id': 62}})

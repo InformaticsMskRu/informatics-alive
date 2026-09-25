@@ -16,7 +16,7 @@ class JudgesApi(MethodView):
             str(judge_id): {
                 'name': cfg.name,
                 'url': cfg.url,
-                'langs': None if cfg.langs is None else {
+                'langs': {
                     lang_id: {'name': lang.name, 'ejudge_lang_id': lang.ejudge_lang_id}
                     for lang_id, lang in cfg.langs.items()
                 },

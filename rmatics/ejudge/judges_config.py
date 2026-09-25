@@ -19,37 +19,34 @@ class JudgeConfig:
     name: str = field(default='')
     token: Optional[str] = field(default=None)
     sender_user_id: int = field(default=5)
-    # rmatics lang_id -> language of the judge. None: the judge doesn't
-    # declare its languages (no language check, lang_ids sent as is).
-    langs: Optional[Dict[int, JudgeLang]] = field(default=None)
+    # rmatics lang_id -> language of the judge: the only languages it accepts
+    langs: Dict[int, JudgeLang] = field(default_factory=dict)
 
     def get_token(self) -> Optional[str]:
         return self.token
 
     def supports_lang(self, lang_id: int) -> bool:
-        return self.langs is None or lang_id in self.langs
+        return lang_id in self.langs
 
     def map_lang_id(self, lang_id: int) -> int:
-        if self.langs is not None:
-            if lang_id not in self.langs:
-                # routing (resolve_route) only lets supported languages through
-                raise ValueError(f'lang_id {lang_id} is not in the judge langs')
-            return self.langs[lang_id].ejudge_lang_id
-        return lang_id
+        if lang_id not in self.langs:
+            # routing (resolve_route) only lets supported languages through
+            raise ValueError(f'lang_id {lang_id} is not in the judge langs')
+        return self.langs[lang_id].ejudge_lang_id
 
 
 def _is_int(value) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _parse_langs(jid, raw) -> Optional[Dict[int, JudgeLang]]:
+def _parse_langs(jid, raw) -> Dict[int, JudgeLang]:
     """{"<lang_id>": {"name": <str>, "ejudge_lang_id": <int>}}; invalid
-    entries are skipped with a warning."""
-    if raw is None:
-        return None
+    entries are skipped with a warning. A judge without valid "langs"
+    accepts no languages."""
     if not isinstance(raw, dict):
-        logger.warning(f'Judge {jid}: "langs" must be an object, ignoring it')
-        return None
+        logger.error(f'Judge {jid}: "langs" is missing or not an object, '
+                     f'the judge accepts no languages')
+        return {}
 
     langs = {}
     for lang_id, lang in raw.items():
