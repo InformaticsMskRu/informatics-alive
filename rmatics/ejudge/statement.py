@@ -10,16 +10,14 @@ header block goes, $$$ math becomes \\( \\), the samples block becomes
 sample_tests_html. Images are returned for pynformatics to store in
 /moodle_probpics/<problem_id>/, where the content links them.
 """
-import logging
 import posixpath
 from typing import Dict, List, NamedTuple, Optional
 
 from bs4 import BeautifulSoup
 
 from rmatics.ejudge import ejudge_api
+from rmatics.ejudge.import_log import ImportLog
 from rmatics.ejudge.judges_config import JudgeConfig
-
-logger = logging.getLogger(__name__)
 
 # the Russian HTML statement of a Polygon package
 STATEMENT_FILE = 'problem.html'
@@ -62,7 +60,8 @@ def _convert_math(html: str) -> str:
     return content
 
 
-def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int) -> Optional[Statement]:
+def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int,
+                    log: ImportLog) -> Optional[Statement]:
     content_type, body = ejudge_api.get_file(judge, contest_id, prob_id, STATEMENT_FILE)
     node = None
     if content_type == 'text/html':
@@ -70,9 +69,11 @@ def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int) -> Option
         node = soup.find('div', class_='problem-statement')
     if node is None:
         # get-file answers a missing file with an error page
-        logger.info(f'Contest {contest_id} problem {prob_id}: no {STATEMENT_FILE} '
-                    f'in attachments, the statement is not imported')
+        log.info(f'problem {prob_id}: no statement, get-file {STATEMENT_FILE} replied '
+                 f'{content_type or "without a content type"} ({len(body)} bytes) '
+                 f'with no problem-statement block')
         return None
+    log.info(f'problem {prob_id}: {STATEMENT_FILE} fetched ({len(body)} bytes)')
 
     for header in node.find_all('div', class_='header'):
         header.decompose()
@@ -92,14 +93,15 @@ def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int) -> Option
             image_type, data = ejudge_api.get_file(judge, contest_id, prob_id, name)
             if image_type.startswith('image/'):
                 images[name] = data
+                log.info(f'problem {prob_id}: image {name} fetched ({image_type}, {len(data)} bytes)')
             else:
                 missing.append(name)
-                logger.warning(f'Contest {contest_id} problem {prob_id}: '
-                               f'image {name} is not in attachments')
+                log.warning(f'problem {prob_id}: image {name} is not in attachments '
+                            f'(get-file replied {image_type or "without a content type"})')
         img['src'] = f'{_PICS_MARKER}/{name}'
 
-    logger.info(f'Contest {contest_id} problem {prob_id}: statement fetched, '
-                f'{len(images)} image(s), samples: {"yes" if sample_tests_html else "no"}')
+    log.info(f'problem {prob_id}: statement processed, {len(images)} image(s), '
+             f'{len(missing)} missing, samples: {"yes" if sample_tests_html else "no"}')
     return Statement(
         content=_convert_math(str(node)),
         sample_tests_html=sample_tests_html,

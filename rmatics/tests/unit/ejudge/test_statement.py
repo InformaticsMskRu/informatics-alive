@@ -2,6 +2,7 @@ import unittest
 from unittest import mock
 
 from rmatics.ejudge import statement
+from rmatics.ejudge.import_log import ImportLog
 from rmatics.ejudge.judges_config import JudgeConfig
 
 JUDGE = JudgeConfig(url='http://ejudge-2/cgi-bin/new-master', token='token-2')
@@ -14,7 +15,9 @@ class TestFetchStatement(unittest.TestCase):
             return files.get(name, ERROR_PAGE)
 
         with mock.patch.object(statement.ejudge_api, 'get_file', side_effect=get_file) as get:
-            return statement.fetch_statement(JUDGE, 2395, 3), [c[0][3] for c in get.call_args_list]
+            self.log = ImportLog(2, 2395)
+            return (statement.fetch_statement(JUDGE, 2395, 3, self.log),
+                    [c[0][3] for c in get.call_args_list])
 
     def page(self, body):
         return ('text/html', f'<html><body><div class="problem-statement">{body}</div></body></html>'.encode())
@@ -24,6 +27,9 @@ class TestFetchStatement(unittest.TestCase):
 
         self.assertIsNone(result)
         self.assertEqual(fetched, ['problem.html'])
+        # what get-file replied instead
+        self.assertIn('no statement, get-file problem.html replied text/html (42 bytes)',
+                      self.log.lines[-1])
 
     def test_not_html(self):
         result, _ = self.fetch({'problem.html': ('application/octet-stream', b'<div class="problem-statement"/>')})
@@ -44,6 +50,8 @@ class TestFetchStatement(unittest.TestCase):
         self.assertEqual(fetched, ['problem.html', 'a.png', 'b.png', 'gone.png'])
         self.assertEqual(result.images, {'a.png': b'A', 'b.png': b'B'})
         self.assertEqual(result.missing_images, ['gone.png'])
+        self.assertTrue(any('warning: problem 3: image gone.png is not in attachments' in line
+                            for line in self.log.lines))
         content = result.content_for(7)
         self.assertEqual(content.count('src="/moodle_probpics/7/a.png"'), 2)
         self.assertIn('src="/moodle_probpics/7/b.png"', content)

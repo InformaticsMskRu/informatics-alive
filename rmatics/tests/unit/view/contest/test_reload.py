@@ -351,7 +351,7 @@ class TestReloadProblem(TestCase):
         resp = self.send_request(problem_id=None)
 
         self.assert200(resp)
-        self.assertEqual(resp.json['data'], {'problems': []})
+        self.assertEqual(resp.json['data']['problems'], [])
 
     def test_contest_not_found(self):
         resp = self.send_request(problem_id=None, ejudge_get=lambda *a, **kw: reply(
@@ -467,6 +467,71 @@ class TestReloadProblem(TestCase):
         self.assertEqual([r['statement'] for r in resp.json['data']['problems']],
                          ['imported', 'imported'])
         self.assertEqual(self.fetched_files, ['problem.html', 'pic.png'] * 2)
+
+    def assert_logged(self, lines, *expected):
+        for text in expected:
+            self.assertTrue(any(text in line for line in lines), f'{text!r} not in {lines}')
+
+    def test_log_of_created_problem(self):
+        self.add_statement()
+
+        data = self.send_request().json['data']
+
+        problem_id = data['problems'][0]['id']
+        self.assert_logged(
+            data['log'],
+            "info: problem 3: ejudge problem 'Sum'",
+            'problem 3: problem.html fetched',
+            'problem 3: image pic.png fetched (image/png, 3 bytes)',
+            'lock rmatics:ejudge_import:2:2395 acquired',
+            'already imported from the contest (ejudge problem: problems): nothing',
+            'problem 3: not imported before, a problem is created',
+            f'problem 3: created problem {problem_id} (mdl_ejudge_problem',
+            'legacy contest_id/ejudge_contest_id/problem_id 0/0/0',
+            f'problem {problem_id} statement and samples replaced',
+            'problem 3: committed',
+            'info: done',
+        )
+
+    def test_log_of_updated_problem(self):
+        existing = self.create_problem(1, ejudge_contest_id=CONTEST, problem_id=PROB, short_id='C')
+
+        data = self.send_request(judge_id=DEFAULT_JUDGE).json['data']
+
+        self.assert_logged(
+            data['log'],
+            f"(ejudge problem: problems): {{3: [{existing.id}]}}",
+            f'problem 3: imported before as problem(s) [{existing.id}]',
+            f"problem {existing.id} updated: name 'Old' -> 'Sum', ejudge_name 'Old' -> 'Sum', "
+            f"timelimit 1.0 -> 1.5",
+            'was routed by the legacy columns, judges_settings',
+            f'problem {existing.id} statement kept',
+        )
+
+    def test_failure_reply_has_the_log(self):
+        def statement_down(url, params, headers, timeout):
+            if params['action'] == 'get-file':
+                raise requests.ConnectionError('down')
+            return self.ejudge_get(url, params, headers, timeout)
+
+        resp = self.send_request(ejudge_get=statement_down)
+
+        self.assertStatus(resp, 502)
+        error = resp.json['error']
+        self.assertIn('get-file problem.html failed', error['message'])
+        self.assert_logged(error['log'], "problem 3: ejudge problem 'Sum'",
+                           'warning: failed: get-file problem.html failed')
+
+    def test_locked_reply_has_the_log(self):
+        release = self.hold_import_lock()
+        self.addCleanup(release)
+
+        with mock.patch.object(problem_import, 'IMPORT_LOCK_TIMEOUT', 0):
+            resp = self.send_request()
+
+        self.assertStatus(resp, 409)
+        self.assert_logged(resp.json['error']['log'],
+                           'warning: lock rmatics:ejudge_import:2:2395 is held by another reload')
 
     def test_get_is_not_allowed(self):
         url = url_for('contest.ejudge_reload_problem', judge_id=OTHER_JUDGE,
