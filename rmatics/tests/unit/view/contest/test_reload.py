@@ -40,8 +40,18 @@ def file_reply(content_type, body):
     return mock.Mock(status_code=200, headers={'Content-Type': content_type}, content=body)
 
 
+def token_file_reply(content_type, body, attachment=None):
+    """get-file's reply to a token: application/json, the file's own CGI
+    headers in the body."""
+    headers = f'Content-type: {content_type}\n'
+    if attachment:
+        headers += f'Content-Disposition: attachment; filename="{attachment}"\n'
+    return file_reply('application/json', headers.encode() + b'\n' + body)
+
+
 # what get-file answers for a file missing from attachments/
-ERROR_PAGE = file_reply('text/html; charset=utf-8', b'<html><body>Operation failed</body></html>')
+ERROR_PAGE = file_reply('application/json', b'{"ok":false,"error":{"num":49,"symbol":"ERR_OPERATION_FAILED",'
+                                           b'"message":"Operation failed"},"action":"get-file"}')
 
 STATEMENT_HTML = """<html><body><div class="problem-statement">
 <div class="header"><div class="title">C. Sum</div></div>
@@ -416,8 +426,8 @@ class TestReloadProblem(TestCase):
 
     def add_statement(self):
         self.attachments = {
-            statement.STATEMENT_FILE: file_reply('text/html', STATEMENT_HTML),
-            'pic.png': file_reply('image/png', b'PNG'),
+            statement.STATEMENT_FILE: token_file_reply('text/html', STATEMENT_HTML),
+            'pic.png': token_file_reply('image/png', b'PNG', attachment='pic.png'),
         }
 
     def test_statement_of_created_problem(self):
@@ -490,6 +500,25 @@ class TestReloadProblem(TestCase):
 
         self.assertEqual((result['action'], result['statement']), ('update', 'imported'))
         self.assert_statement_imported(existing.id, result['problems'][0])
+
+    def test_missing_statement_logs_the_ejudge_error(self):
+        data = self.send_request().json['data']
+
+        self.assert_logged(data['log'], 'problem 3: no statement, get-file problem.html replied '
+                                        'error ERR_OPERATION_FAILED Operation failed')
+
+    def test_time_limit_millis_0_is_unset(self):
+        # what ejudge sends for a problem with only time_limit set
+        self.ejudge_problem = dict(EJUDGE_PROBLEM, time_limit_millis=0, time_limit=1)
+        existing = self.create_problem(1, judges_settings=[
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}])
+        self.get_problem(existing.id).timelimit = 0
+        db.session.commit()
+
+        data = self.send_request().json['data']
+
+        self.assertEqual(self.get_problem(existing.id).timelimit, 1)
+        self.assert_logged(data['log'], 'timelimit 0.0 -> 1')
 
     def test_no_statement_keeps_content(self):
         existing = self.create_problem(1, judges_settings=[
