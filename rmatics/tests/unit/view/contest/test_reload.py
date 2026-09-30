@@ -328,6 +328,53 @@ class TestReloadProblem(TestCase):
         self.assertStatus(resp, 502)
         self.assertEqual(db.session.query(Problem).count(), 0)
 
+    def hold_import_lock(self, judge_id=OTHER_JUDGE, contest_id=CONTEST):
+        """Hold the contest lock from another connection, as a concurrent reload does."""
+        name = f'rmatics:ejudge_import:{judge_id}:{contest_id}'
+        conn = db.engine.connect()
+        self.assertEqual(conn.execute(text('SELECT GET_LOCK(:name, 0)'), name=name).scalar(), 1)
+
+        def release():
+            conn.execute(text('SELECT RELEASE_LOCK(:name)'), name=name)
+            conn.close()
+        return release
+
+    def test_locked_contest_is_conflict(self):
+        release = self.hold_import_lock()
+        try:
+            with mock.patch.object(problem_import, 'IMPORT_LOCK_TIMEOUT', 0):
+                problem_resp = self.send_request()
+                contest_resp = self.send_request(problem_id=None)
+        finally:
+            release()
+
+        self.assertStatus(problem_resp, 409)
+        self.assertStatus(contest_resp, 409)
+        self.assertEqual(db.session.query(Problem).count(), 0)
+
+        self.assert200(self.send_request())
+
+    def test_lock_is_per_contest_and_judge(self):
+        release = self.hold_import_lock(contest_id=CONTEST + 1)
+        self.addCleanup(release)
+
+        with mock.patch.object(problem_import, 'IMPORT_LOCK_TIMEOUT', 0):
+            self.assert200(self.send_request())
+            self.assert200(self.send_request(judge_id=DEFAULT_JUDGE))
+
+    def test_lock_is_released_after_failure(self):
+        def contest_status_fails(url, params, headers, timeout):
+            if params['action'] == 'contest-status-json':
+                return reply({'ok': False, 'error': {'symbol': 'ERR_INTERNAL'}}, 500)
+            return self.ejudge_get(url, params, headers, timeout)
+
+        # the contest row of the default judge is created under the lock
+        failed = self.send_request(judge_id=DEFAULT_JUDGE, ejudge_get=contest_status_fails)
+        self.assertStatus(failed, 502)
+
+        with mock.patch.object(problem_import, 'IMPORT_LOCK_TIMEOUT', 0):
+            self.assert200(self.send_request(judge_id=DEFAULT_JUDGE))
+
     def test_get_is_not_allowed(self):
         url = url_for('contest.ejudge_reload_problem', judge_id=OTHER_JUDGE,
                       contest_id=CONTEST, problem_id=PROB)

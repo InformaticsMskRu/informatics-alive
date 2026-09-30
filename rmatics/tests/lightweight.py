@@ -49,6 +49,26 @@ def _patch_sqlalchemy():
 
     tmpdir = tempfile.mkdtemp(prefix='rmatics-test-db-')
 
+    # MySQL named locks: a name held by another connection is not waited
+    # for, GET_LOCK returns 0 at once
+    held_locks = {}
+
+    def _named_lock_functions(dbapi_conn):
+        def get_lock(name, timeout):
+            if held_locks.get(name, dbapi_conn) is not dbapi_conn:
+                return 0
+            held_locks[name] = dbapi_conn
+            return 1
+
+        def release_lock(name):
+            if held_locks.get(name) is not dbapi_conn:
+                return None if name not in held_locks else 0
+            del held_locks[name]
+            return 1
+
+        dbapi_conn.create_function('GET_LOCK', 2, get_lock)
+        dbapi_conn.create_function('RELEASE_LOCK', 1, release_lock)
+
     @event.listens_for(Engine, 'connect')
     def _attach_schemas(dbapi_conn, connection_record):
         if not isinstance(dbapi_conn, sqlite3.Connection):
@@ -58,6 +78,7 @@ def _patch_sqlalchemy():
             path = os.path.join(tmpdir, f'{schema}.db')
             cursor.execute(f'ATTACH DATABASE ? AS {schema}', (path,))
         cursor.close()
+        _named_lock_functions(dbapi_conn)
 
     from rmatics.config import TestConfig
     TestConfig.SQLALCHEMY_DATABASE_URI = \

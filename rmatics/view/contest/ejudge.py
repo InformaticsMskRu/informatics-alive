@@ -1,10 +1,10 @@
 from flask import current_app
 from flask.views import MethodView
-from werkzeug.exceptions import BadGateway, NotFound
+from werkzeug.exceptions import BadGateway, Conflict, NotFound
 
 from rmatics.ejudge.ejudge_api import EjudgeApiError, EjudgeNotFound
 from rmatics.ejudge.judges_config import get_judge
-from rmatics.ejudge.problem_import import import_contest, import_problem
+from rmatics.ejudge.problem_import import ImportLocked, import_contest, import_problem
 from rmatics.utils.response import jsonify
 
 
@@ -15,6 +15,8 @@ def _reload(judge_id: int, what: str, do_import):
 
     try:
         result = do_import(judge)
+    except ImportLocked as e:
+        raise Conflict(str(e))
     except EjudgeNotFound as e:
         raise NotFound(str(e))
     except EjudgeApiError as e:

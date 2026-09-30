@@ -6,9 +6,10 @@ isn't: a new problem gets a placeholder, an existing one keeps its own.
 """
 import datetime
 from collections import defaultdict
+from contextlib import contextmanager
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import Text, type_coerce
+from sqlalchemy import Text, text, type_coerce
 
 from rmatics.ejudge import ejudge_api
 from rmatics.ejudge.judges_config import JudgeConfig, get_default_judge_id
@@ -23,6 +24,35 @@ NO_NAME = 'Без названия'
 
 # (judge_id, contest_id, prob_id) of an ejudge problem
 ProblemKey = Tuple[int, int, int]
+
+IMPORT_LOCK_TIMEOUT = 20  # seconds
+
+
+class ImportLocked(Exception):
+    """Another reload of the contest didn't finish in IMPORT_LOCK_TIMEOUT."""
+
+
+@contextmanager
+def _import_lock(judge_id: int, contest_id: int):
+    """Serializes the reloads of a contest on a judge: the imported problems
+    are looked up and created under it, so concurrent reloads can't both
+    create a problem.
+
+    A MySQL named lock belongs to a connection, while the import commits
+    and so returns the session's connection to the pool: the lock is held
+    on a connection of its own.
+    """
+    name = f'rmatics:ejudge_import:{judge_id}:{contest_id}'
+    with db.engine.connect() as conn:
+        acquired = conn.execute(text('SELECT GET_LOCK(:name, :timeout)'),
+                                name=name, timeout=IMPORT_LOCK_TIMEOUT).scalar()
+        if acquired != 1:
+            raise ImportLocked(f'Contest {contest_id} of judge {judge_id} '
+                               f'is being reloaded, try again later')
+        try:
+            yield
+        finally:
+            conn.execute(text('SELECT RELEASE_LOCK(:name)'), name=name)
 
 
 def problem_fields(ejudge_problem: dict) -> dict:
@@ -160,8 +190,9 @@ def import_problem(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: 
     (see index_imported_problems); an imported problem without
     judges_settings gets the entry routing to this ejudge problem."""
     ejudge_problem = ejudge_api.get_problem(judge, contest_id, prob_id)
-    index = index_imported_problems(contest_id)
-    return _import(judge, judge_id, contest_id, prob_id, ejudge_problem, index)
+    with _import_lock(judge_id, contest_id):
+        index = index_imported_problems(contest_id)
+        return _import(judge, judge_id, contest_id, prob_id, ejudge_problem, index)
 
 
 def import_contest(judge: JudgeConfig, judge_id: int, contest_id: int) -> dict:
@@ -171,14 +202,15 @@ def import_contest(judge: JudgeConfig, judge_id: int, contest_id: int) -> dict:
     before it imported.
     """
     ejudge_problems = ejudge_api.list_problems(judge, contest_id)
-    index = index_imported_problems(contest_id)
     results = []
-    for ejudge_problem in ejudge_problems:
-        prob_id = ejudge_problem.get('id')
-        if not isinstance(prob_id, int):
-            raise ejudge_api.EjudgeApiError(
-                f'list-problems-json failed: problem without id: {ejudge_problem!r}')
-        results.append(_import(judge, judge_id, contest_id, prob_id, ejudge_problem, index))
+    with _import_lock(judge_id, contest_id):
+        index = index_imported_problems(contest_id)
+        for ejudge_problem in ejudge_problems:
+            prob_id = ejudge_problem.get('id')
+            if not isinstance(prob_id, int):
+                raise ejudge_api.EjudgeApiError(
+                    f'list-problems-json failed: problem without id: {ejudge_problem!r}')
+            results.append(_import(judge, judge_id, contest_id, prob_id, ejudge_problem, index))
     return {'problems': results}
 
 
