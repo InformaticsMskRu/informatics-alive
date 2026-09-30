@@ -1,13 +1,12 @@
-"""Лёгкая локальная инфраструктура для тестов.
+"""Lightweight local infrastructure for tests.
 
-Позволяет запускать тестовый набор без docker-compose (mariadb/mongo/redis):
-  * MySQL   -> sqlite (схемы moodle/ejudge/pynformatics цепляются через ATTACH)
+Runs the test suite without docker-compose (mariadb/mongo/redis):
+  * MySQL   -> sqlite (the moodle/ejudge/pynformatics schemas are ATTACHed)
   * MongoDB -> mongomock
   * Redis   -> fakeredis
 
-Включается переменной окружения TEST_INFRA=local (см. rmatics/testutils.py),
-по умолчанию тесты, как и раньше, ходят в настоящие сервисы из
-docker/docker-compose.yml.
+Enabled by the TEST_INFRA=local environment variable (see rmatics/testutils.py);
+by default the tests use the real services from docker/docker-compose.yml.
 """
 import os
 import sys
@@ -15,7 +14,7 @@ import tempfile
 
 try:
     import sqlite3
-except ImportError:  # интерпретатор собран без sqlite3 — берём pysqlite3-binary
+except ImportError:  # python built without sqlite3: use pysqlite3-binary
     import pysqlite3 as sqlite3
     sys.modules['sqlite3'] = sqlite3
     sys.modules['sqlite3.dbapi2'] = sqlite3.dbapi2
@@ -42,12 +41,32 @@ def _patch_sqlalchemy():
     from sqlalchemy.ext.compiler import compiles
     from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
-    # mysql-специфичные типы, которых sqlite не знает
+    # mysql-specific types sqlite doesn't know
     @compiles(MEDIUMTEXT, 'sqlite')
     def _compile_mediumtext(type_, compiler, **kw):
         return 'TEXT'
 
     tmpdir = tempfile.mkdtemp(prefix='rmatics-test-db-')
+
+    # MySQL named locks: a name held by another connection is not waited
+    # for, GET_LOCK returns 0 at once
+    held_locks = {}
+
+    def _named_lock_functions(dbapi_conn):
+        def get_lock(name, timeout):
+            if held_locks.get(name, dbapi_conn) is not dbapi_conn:
+                return 0
+            held_locks[name] = dbapi_conn
+            return 1
+
+        def release_lock(name):
+            if held_locks.get(name) is not dbapi_conn:
+                return None if name not in held_locks else 0
+            del held_locks[name]
+            return 1
+
+        dbapi_conn.create_function('GET_LOCK', 2, get_lock)
+        dbapi_conn.create_function('RELEASE_LOCK', 1, release_lock)
 
     @event.listens_for(Engine, 'connect')
     def _attach_schemas(dbapi_conn, connection_record):
@@ -58,18 +77,19 @@ def _patch_sqlalchemy():
             path = os.path.join(tmpdir, f'{schema}.db')
             cursor.execute(f'ATTACH DATABASE ? AS {schema}', (path,))
         cursor.close()
+        _named_lock_functions(dbapi_conn)
 
     from rmatics.config import TestConfig
     TestConfig.SQLALCHEMY_DATABASE_URI = \
         'sqlite:///' + os.path.join(tmpdir, 'main.db')
-    # опции пула несовместимы с sqlite (NullPool)
+    # pool options don't apply to sqlite (NullPool)
     TestConfig.SQLALCHEMY_POOL_SIZE = None
     TestConfig.SQLALCHEMY_POOL_RECYCLE = None
 
 
 def _patch_redis():
-    """Все клиенты redis (flask_redis, redlock) создаются через
-    StrictRedis.from_url — подменяем его на fakeredis с общим сервером."""
+    """All redis clients (flask_redis, redlock) are created with
+    StrictRedis.from_url: it is replaced with fakeredis on a shared server."""
     import fakeredis
     import redis as redis_pkg
 
