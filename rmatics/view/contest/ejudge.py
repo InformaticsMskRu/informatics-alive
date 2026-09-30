@@ -1,27 +1,32 @@
-from flask import current_app
 from flask.views import MethodView
-from werkzeug.exceptions import BadGateway, Conflict, NotFound
+from werkzeug.exceptions import NotFound
 
 from rmatics.ejudge.ejudge_api import EjudgeApiError, EjudgeNotFound
+from rmatics.ejudge.import_log import ImportLog
 from rmatics.ejudge.judges_config import get_judge
 from rmatics.ejudge.problem_import import ImportLocked, import_contest, import_problem
 from rmatics.utils.response import jsonify
 
 
-def _reload(judge_id: int, what: str, do_import):
+def _reload(judge_id: int, contest_id: int, do_import):
+    """Run the import; the reply carries its log, a failure's too."""
     judge = get_judge(judge_id)
     if judge is None:
         raise NotFound(f'Judge {judge_id} is not configured')
 
+    log = ImportLog(judge_id, contest_id)
     try:
-        result = do_import(judge)
+        result = do_import(judge, log)
     except ImportLocked as e:
-        raise Conflict(str(e))
+        return jsonify({'message': str(e), 'log': log.lines}, status_code=409)
     except EjudgeNotFound as e:
-        raise NotFound(str(e))
+        log.warning(f'failed: {e}')
+        return jsonify({'message': str(e), 'log': log.lines}, status_code=404)
     except EjudgeApiError as e:
-        current_app.logger.warning(f'Reload of {what} on judge {judge_id} failed: {e}')
-        raise BadGateway(str(e))
+        log.warning(f'failed: {e}')
+        return jsonify({'message': str(e), 'log': log.lines}, status_code=502)
+    log.info('done')
+    result['log'] = log.lines
     return jsonify(result)
 
 
@@ -33,13 +38,13 @@ class ReloadProblemApi(MethodView):
     """
     def post(self, judge_id: int, contest_id: int, problem_id: int):
         return _reload(
-            judge_id, f'problem {problem_id} of contest {contest_id}',
-            lambda judge: import_problem(judge, judge_id, contest_id, problem_id))
+            judge_id, contest_id,
+            lambda judge, log: import_problem(judge, judge_id, contest_id, problem_id, log))
 
 
 class ReloadContestApi(MethodView):
     """ReloadProblemApi for every problem of the contest."""
     def post(self, judge_id: int, contest_id: int):
         return _reload(
-            judge_id, f'contest {contest_id}',
-            lambda judge: import_contest(judge, judge_id, contest_id))
+            judge_id, contest_id,
+            lambda judge, log: import_contest(judge, judge_id, contest_id, log))
