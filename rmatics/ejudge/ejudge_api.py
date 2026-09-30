@@ -4,7 +4,8 @@ import problems.
 Replies are {"ok": true, ...} on success and
 {"ok": false, "error": {"num", "symbol", "message"}} on failure.
 """
-from typing import Tuple
+import json
+from typing import Optional, Tuple
 
 import requests
 
@@ -72,8 +73,8 @@ def list_problems(judge: JudgeConfig, contest_id: int) -> list:
 def get_file(judge: JudgeConfig, contest_id: int, prob_id: int, name: str) -> Tuple[str, bytes]:
     """A file of the problem's attachments/ directory: (content type, bytes).
 
-    ejudge answers a missing file with its HTML error page, not an error
-    status: the caller checks the content.
+    A missing file is not an error status: ejudge replies with an error
+    (JSON {"ok": false} to a token), the caller checks the content.
     """
     try:
         resp = requests.get(
@@ -85,8 +86,34 @@ def get_file(judge: JudgeConfig, contest_id: int, prob_id: int, name: str) -> Tu
         )
     except requests.RequestException as e:
         raise EjudgeApiError(f'get-file {name} failed: {e}') from e
-    content_type = resp.headers.get('Content-Type', '').split(';')[0].strip().lower()
-    return content_type, resp.content
+    content_type = _media_type(resp.headers.get('Content-Type', ''))
+    body = resp.content
+    # To a token ejudge replies application/json, and get-file writes the
+    # file's own CGI headers into the body: the file follows them
+    if body[:len(_CGI_CONTENT_TYPE)].lower() == _CGI_CONTENT_TYPE:
+        headers, separator, file_body = body.partition(b'\n\n')
+        if separator:
+            content_type = _media_type(headers.split(b'\n', 1)[0].split(b':', 1)[1].decode('latin-1'))
+            body = file_body
+    return content_type, body
+
+
+_CGI_CONTENT_TYPE = b'content-type:'
+
+
+def _media_type(content_type: str) -> str:
+    return content_type.split(';')[0].strip().lower()
+
+
+def describe_error(body: bytes) -> Optional[str]:
+    """The error of an ejudge JSON error reply, None for another reply."""
+    try:
+        error = json.loads(body.decode('utf-8'))['error']
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(error, dict):
+        return None
+    return ' '.join(str(part) for part in (error.get('symbol'), error.get('message')) if part) or None
 
 
 def get_contest_name(judge: JudgeConfig, contest_id: int) -> str:

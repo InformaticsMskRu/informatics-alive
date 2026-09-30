@@ -57,6 +57,28 @@ class TestEjudgeApi(unittest.TestCase):
             'action': 'get-file', 'contest_id': 2395, 'prob_id': 3, 'file': 'pic.png'})
         self.assertEqual(get.call_args[1]['headers'], {'Authorization': 'Bearer token-2'})
 
+    def test_get_file_token_reply(self):
+        # to a token ejudge replies application/json with get-file's headers in the body
+        resp = mock.Mock(status_code=200, headers={'Content-Type': 'application/json'},
+                         content=b'Content-type: image/png\n'
+                                 b'Content-Disposition: attachment; filename="pic.png"\n'
+                                 b'\nPNG\n\nbytes')
+        (content_type, body), _ = self.call(ejudge_api.get_file, 2395, 3, 'pic.png', resp=resp)
+
+        self.assertEqual((content_type, body), ('image/png', b'PNG\n\nbytes'))
+
+    def test_get_file_json_error(self):
+        resp = mock.Mock(status_code=200, headers={'Content-Type': 'application/json'},
+                         content=b'{"ok":false,"error":{"symbol":"ERR_INV_FILE_NAME"}}')
+        (content_type, body), _ = self.call(ejudge_api.get_file, 2395, 3, 'x.png', resp=resp)
+
+        self.assertEqual(content_type, 'application/json')
+        self.assertEqual(ejudge_api.describe_error(body), 'ERR_INV_FILE_NAME')
+
+    def test_describe_error_of_other_replies(self):
+        self.assertIsNone(ejudge_api.describe_error(b'<html/>'))
+        self.assertIsNone(ejudge_api.describe_error(b'{"ok":true}'))
+
     def test_get_file_connection_error(self):
         with self.assertRaises(EjudgeApiError):
             self.call(ejudge_api.get_file, 2395, 3, 'pic.png',

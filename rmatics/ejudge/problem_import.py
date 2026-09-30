@@ -67,7 +67,8 @@ def problem_fields(ejudge_problem: dict) -> dict:
     """Problem values from the ejudge problem, derived the way the
     filesystem reload derives them from serve.cfg."""
     long_name = ejudge_problem.get('long_name') or ''
-    if 'time_limit_millis' in ejudge_problem:
+    # ejudge returns time_limit_millis 0 when only time_limit is set
+    if ejudge_problem.get('time_limit_millis', 0) > 0:
         timelimit = ejudge_problem['time_limit_millis'] / 1000
     else:
         timelimit = ejudge_problem.get('time_limit', -1)

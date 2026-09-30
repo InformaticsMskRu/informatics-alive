@@ -60,6 +60,14 @@ def _convert_math(html: str) -> str:
     return content
 
 
+def _describe_reply(content_type: str, body: bytes) -> str:
+    """What get-file replied instead of the expected file."""
+    error = ejudge_api.describe_error(body) if content_type == 'application/json' else None
+    if error:
+        return f'replied error {error}'
+    return f'replied {content_type or "without a content type"} ({len(body)} bytes)'
+
+
 def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int,
                     log: ImportLog) -> Optional[Statement]:
     content_type, body = ejudge_api.get_file(judge, contest_id, prob_id, STATEMENT_FILE)
@@ -68,10 +76,8 @@ def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int,
         soup = BeautifulSoup(body.decode('utf-8', 'replace'), 'html.parser')
         node = soup.find('div', class_='problem-statement')
     if node is None:
-        # get-file answers a missing file with an error page
-        log.info(f'problem {prob_id}: no statement, get-file {STATEMENT_FILE} replied '
-                 f'{content_type or "without a content type"} ({len(body)} bytes) '
-                 f'with no problem-statement block')
+        log.info(f'problem {prob_id}: no statement, get-file {STATEMENT_FILE} '
+                 f'{_describe_reply(content_type, body)}')
         return None
     log.info(f'problem {prob_id}: {STATEMENT_FILE} fetched ({len(body)} bytes)')
 
@@ -97,7 +103,7 @@ def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int,
             else:
                 missing.append(name)
                 log.warning(f'problem {prob_id}: image {name} is not in attachments '
-                            f'(get-file replied {image_type or "without a content type"})')
+                            f'(get-file {_describe_reply(image_type, data)})')
         img['src'] = f'{_PICS_MARKER}/{name}'
 
     log.info(f'problem {prob_id}: statement processed, {len(images)} image(s), '

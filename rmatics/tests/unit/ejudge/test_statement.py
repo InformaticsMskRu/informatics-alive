@@ -7,6 +7,7 @@ from rmatics.ejudge.judges_config import JudgeConfig
 
 JUDGE = JudgeConfig(url='http://ejudge-2/cgi-bin/new-master', token='token-2')
 ERROR_PAGE = ('text/html', b'<html><body>Operation failed</body></html>')
+JSON_ERROR = ('application/json', b'{"ok":false,"error":{"symbol":"ERR_INV_FILE_NAME","message":"Invalid file name"}}')
 
 
 class TestFetchStatement(unittest.TestCase):
@@ -29,6 +30,13 @@ class TestFetchStatement(unittest.TestCase):
         self.assertEqual(fetched, ['problem.html'])
         # what get-file replied instead
         self.assertIn('no statement, get-file problem.html replied text/html (42 bytes)',
+                      self.log.lines[-1])
+
+    def test_missing_statement_json_error(self):
+        result, _ = self.fetch({'problem.html': JSON_ERROR})
+
+        self.assertIsNone(result)
+        self.assertIn('no statement, get-file problem.html replied error ERR_INV_FILE_NAME Invalid file name',
                       self.log.lines[-1])
 
     def test_not_html(self):
