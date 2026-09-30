@@ -47,7 +47,7 @@ class TestFetchStatement(unittest.TestCase):
     def test_images(self):
         result, fetched = self.fetch({
             'problem.html': self.page(
-                '<img src="a.png"/><img src="a.png"/><img src="dir/b.png?x=1"/>'
+                '<img src="a.png"/><img src="a.png"/><img src="dir/b.png?x=1" style="width: 5em"/>'
                 '<img src="gone.png"/><img src="http://example.com/c.png"/>'
                 '<img src="/moodle_probpics/1/d.png"/><img src="data:image/png;base64,AA=="/>'),
             'a.png': ('image/png', b'A'),
@@ -68,6 +68,9 @@ class TestFetchStatement(unittest.TestCase):
         self.assertIn('src="http://example.com/c.png"', content)
         self.assertIn('src="/moodle_probpics/1/d.png"', content)
         self.assertIn('src="data:image/png;base64,AA=="', content)
+        # every image fits the page, keeping its own style
+        self.assertEqual(content.count('style="max-width: 100%; height: auto"'), 6)
+        self.assertIn('style="max-width: 100%; height: auto; width: 5em"', content)
 
     def test_processing(self):
         result, _ = self.fetch({'problem.html': self.page(

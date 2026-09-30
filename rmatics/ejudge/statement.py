@@ -26,6 +26,9 @@ PROBPICS_URL = '/moodle_probpics'
 # stands for PROBPICS_URL/<problem_id> until the problem id is known
 _PICS_MARKER = '__probpics__'
 
+# Polygon's stylesheet, which fits images to the page, isn't imported
+_IMG_STYLE = 'max-width: 100%; height: auto'
+
 
 class Statement(NamedTuple):
     content: str
@@ -92,6 +95,8 @@ def fetch_statement(judge: JudgeConfig, contest_id: int, prob_id: int,
 
     images, missing = {}, []
     for img in node.find_all('img'):
+        # the image's own style goes last, to take precedence
+        img['style'] = '; '.join(filter(None, [_IMG_STYLE, img.get('style')]))
         name = _image_name(img.get('src'))
         if name is None:
             continue
