@@ -40,6 +40,10 @@ class TestReloadProblem(TestCase):
         super().setUp()
         self.create_judges()  # judge 1 is the default one
         self.ejudge_problem = dict(EJUDGE_PROBLEM)
+        self.contest_problems = [
+            dict(EJUDGE_PROBLEM, id=1, short_name='A', long_name='First'),
+            dict(EJUDGE_PROBLEM, id=2, short_name='B', long_name='Second'),
+        ]
         self.contest_name = 'Contest 2395'
 
         # the test schema has no AUTO_INCREMENT on the composite primary
@@ -59,14 +63,20 @@ class TestReloadProblem(TestCase):
     def ejudge_get(self, url, params, headers, timeout):
         if params['action'] == 'get-problem-json':
             return reply({'ok': True, 'problem': self.ejudge_problem})
+        if params['action'] == 'list-problems-json':
+            return reply({'ok': True, 'problems': self.contest_problems})
         if params['action'] == 'contest-status-json':
             return reply({'ok': True, 'result': {'contest': {'name': self.contest_name}}})
         raise AssertionError(f'unexpected action {params["action"]}')
 
     def send_request(self, judge_id=OTHER_JUDGE, contest_id=CONTEST, problem_id=PROB,
                      ejudge_get=None):
-        url = url_for('contest.ejudge_reload_problem', judge_id=judge_id,
-                      contest_id=contest_id, problem_id=problem_id)
+        if problem_id is None:
+            url = url_for('contest.ejudge_reload_contest', judge_id=judge_id,
+                          contest_id=contest_id)
+        else:
+            url = url_for('contest.ejudge_reload_problem', judge_id=judge_id,
+                          contest_id=contest_id, problem_id=problem_id)
         with mock.patch.object(ejudge_api.requests, 'get',
                                side_effect=ejudge_get or self.ejudge_get) as get:
             resp = self.client.post(url)
@@ -253,6 +263,57 @@ class TestReloadProblem(TestCase):
             raise requests.ConnectionError('down')
 
         resp = self.send_request(ejudge_get=down)
+
+        self.assertStatus(resp, 502)
+        self.assertEqual(db.session.query(Problem).count(), 0)
+
+    def test_contest_imports_every_problem(self):
+        existing = self.create_problem(1, judges_settings=[
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': 2}])
+
+        resp = self.send_request(problem_id=None)
+
+        self.assert200(resp)
+        results = resp.json['data']['problems']
+        self.assertEqual([(r['ejudge_problem']['id'], r['action']) for r in results],
+                         [(1, 'create'), (2, 'update')])
+        self.assertEqual(results[1]['problems'], [{'id': existing.id, 'name': 'Second'}])
+        created = self.get_problem(results[0]['problems'][0]['id'])
+        self.assertEqual((created.name, created.short_id), ('First', 'A'))
+        self.assertEqual(created.judges_settings,
+                         [{'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': 1}])
+        # the listed problems are used as is, without a request per problem
+        self.assertEqual(self.ejudge_calls, ['list-problems-json'])
+
+    def test_contest_of_default_judge_creates_contest_once(self):
+        resp = self.send_request(judge_id=DEFAULT_JUDGE, problem_id=None)
+
+        self.assert200(resp)
+        contest = db.session.query(EjudgeContest).one()
+        for result in resp.json['data']['problems']:
+            problem = self.get_problem(result['problems'][0]['id'])
+            self.assertEqual((problem.contest_id, problem.ejudge_contest_id),
+                             (contest.id, CONTEST))
+        self.assertEqual(self.ejudge_calls, ['list-problems-json', 'contest-status-json'])
+
+    def test_empty_contest(self):
+        self.contest_problems = []
+
+        resp = self.send_request(problem_id=None)
+
+        self.assert200(resp)
+        self.assertEqual(resp.json['data'], {'problems': []})
+
+    def test_contest_not_found(self):
+        resp = self.send_request(problem_id=None, ejudge_get=lambda *a, **kw: reply(
+            {'ok': False, 'error': {'symbol': 'ERR_INV_CONTEST_ID'}}, 404))
+
+        self.assert404(resp)
+
+    def test_contest_problem_without_id(self):
+        self.contest_problems = [{'short_name': 'A'}]
+
+        resp = self.send_request(problem_id=None)
 
         self.assertStatus(resp, 502)
         self.assertEqual(db.session.query(Problem).count(), 0)

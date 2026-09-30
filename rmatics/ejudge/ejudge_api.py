@@ -58,6 +58,15 @@ def get_problem(judge: JudgeConfig, contest_id: int, prob_id: int) -> dict:
     return problem
 
 
+def list_problems(judge: JudgeConfig, contest_id: int) -> list:
+    """The concrete problems of the contest, resolved like get_problem."""
+    data = _call(judge, contest_id, 'list-problems-json', size_mode=1)
+    problems = data.get('problems')
+    if not isinstance(problems, list):
+        raise EjudgeApiError('list-problems-json failed: no problems in the reply')
+    return problems
+
+
 def get_contest_name(judge: JudgeConfig, contest_id: int) -> str:
     data = _call(judge, contest_id, 'contest-status-json')
     try:

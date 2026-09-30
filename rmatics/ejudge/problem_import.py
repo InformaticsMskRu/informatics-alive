@@ -151,6 +151,27 @@ def import_problem(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: 
     (see find_imported_problems); an imported problem without
     judges_settings gets the entry routing to this ejudge problem."""
     ejudge_problem = ejudge_api.get_problem(judge, contest_id, prob_id)
+    return _import(judge, judge_id, contest_id, prob_id, ejudge_problem)
+
+
+def import_contest(judge: JudgeConfig, judge_id: int, contest_id: int) -> dict:
+    """import_problem for every problem of the contest.
+
+    Each problem is committed on its own: a failure leaves the problems
+    before it imported.
+    """
+    results = []
+    for ejudge_problem in ejudge_api.list_problems(judge, contest_id):
+        prob_id = ejudge_problem.get('id')
+        if not isinstance(prob_id, int):
+            raise ejudge_api.EjudgeApiError(
+                f'list-problems-json failed: problem without id: {ejudge_problem!r}')
+        results.append(_import(judge, judge_id, contest_id, prob_id, ejudge_problem))
+    return {'problems': results}
+
+
+def _import(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: int,
+            ejudge_problem: dict) -> dict:
     fields = problem_fields(ejudge_problem)
     entry = {'judge_id': judge_id, 'contest_id': contest_id, 'problem_id': prob_id}
 
@@ -172,6 +193,6 @@ def import_problem(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: 
         'problems': [{'id': problem.id, 'name': problem.name} for problem in problems],
         'ejudge_problem': {
             key: ejudge_problem.get(key)
-            for key in ('short_name', 'long_name', 'internal_name', 'extid', 'uuid')
+            for key in ('id', 'short_name', 'long_name', 'internal_name', 'extid', 'uuid')
         },
     }

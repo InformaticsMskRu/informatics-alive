@@ -35,6 +35,18 @@ class TestEjudgeApi(unittest.TestCase):
         })
         self.assertEqual(get.call_args[1]['headers'], {'Authorization': 'Bearer token-2'})
 
+    def test_list_problems(self):
+        problems, get = self.call(ejudge_api.list_problems, 2395, resp=reply(
+            {'ok': True, 'problems': [{'id': 1}, {'id': 2}]}))
+
+        self.assertEqual(problems, [{'id': 1}, {'id': 2}])
+        self.assertEqual(get.call_args[1]['params'],
+                         {'action': 'list-problems-json', 'contest_id': 2395, 'size_mode': 1})
+
+    def test_list_problems_without_problems(self):
+        with self.assertRaises(EjudgeApiError):
+            self.call(ejudge_api.list_problems, 2395, resp=reply({'ok': True}))
+
     def test_get_contest_name(self):
         name, get = self.call(ejudge_api.get_contest_name, 2395, resp=reply({
             'ok': True, 'result': {'contest': {'id': 2395, 'name': 'Contest'}},

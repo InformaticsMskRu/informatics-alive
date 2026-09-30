@@ -4,8 +4,23 @@ from werkzeug.exceptions import BadGateway, NotFound
 
 from rmatics.ejudge.ejudge_api import EjudgeApiError, EjudgeNotFound
 from rmatics.ejudge.judges_config import get_judge
-from rmatics.ejudge.problem_import import import_problem
+from rmatics.ejudge.problem_import import import_contest, import_problem
 from rmatics.utils.response import jsonify
+
+
+def _reload(judge_id: int, what: str, do_import):
+    judge = get_judge(judge_id)
+    if judge is None:
+        raise NotFound(f'Judge {judge_id} is not configured')
+
+    try:
+        result = do_import(judge)
+    except EjudgeNotFound as e:
+        raise NotFound(str(e))
+    except EjudgeApiError as e:
+        current_app.logger.warning(f'Reload of {what} on judge {judge_id} failed: {e}')
+        raise BadGateway(str(e))
+    return jsonify(result)
 
 
 class ReloadProblemApi(MethodView):
@@ -15,17 +30,14 @@ class ReloadProblemApi(MethodView):
     Called by pynformatics, which checks the moodle capability.
     """
     def post(self, judge_id: int, contest_id: int, problem_id: int):
-        judge = get_judge(judge_id)
-        if judge is None:
-            raise NotFound(f'Judge {judge_id} is not configured')
+        return _reload(
+            judge_id, f'problem {problem_id} of contest {contest_id}',
+            lambda judge: import_problem(judge, judge_id, contest_id, problem_id))
 
-        try:
-            result = import_problem(judge, judge_id, contest_id, problem_id)
-        except EjudgeNotFound as e:
-            raise NotFound(str(e))
-        except EjudgeApiError as e:
-            current_app.logger.warning(
-                f'Reload of problem {problem_id} of contest {contest_id} '
-                f'on judge {judge_id} failed: {e}')
-            raise BadGateway(str(e))
-        return jsonify(result)
+
+class ReloadContestApi(MethodView):
+    """ReloadProblemApi for every problem of the contest."""
+    def post(self, judge_id: int, contest_id: int):
+        return _reload(
+            judge_id, f'contest {contest_id}',
+            lambda judge: import_contest(judge, judge_id, contest_id))
