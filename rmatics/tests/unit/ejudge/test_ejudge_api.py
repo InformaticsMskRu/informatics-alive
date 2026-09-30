@@ -47,6 +47,21 @@ class TestEjudgeApi(unittest.TestCase):
         with self.assertRaises(EjudgeApiError):
             self.call(ejudge_api.list_problems, 2395, resp=reply({'ok': True}))
 
+    def test_get_file(self):
+        resp = mock.Mock(status_code=200, content=b'PNG',
+                         headers={'Content-Type': 'image/PNG; charset=binary'})
+        (content_type, body), get = self.call(ejudge_api.get_file, 2395, 3, 'pic.png', resp=resp)
+
+        self.assertEqual((content_type, body), ('image/png', b'PNG'))
+        self.assertEqual(get.call_args[1]['params'], {
+            'action': 'get-file', 'contest_id': 2395, 'prob_id': 3, 'file': 'pic.png'})
+        self.assertEqual(get.call_args[1]['headers'], {'Authorization': 'Bearer token-2'})
+
+    def test_get_file_connection_error(self):
+        with self.assertRaises(EjudgeApiError):
+            self.call(ejudge_api.get_file, 2395, 3, 'pic.png',
+                      side_effect=requests.ConnectionError('down'))
+
     def test_get_contest_name(self):
         name, get = self.call(ejudge_api.get_contest_name, 2395, resp=reply({
             'ok': True, 'result': {'contest': {'id': 2395, 'name': 'Contest'}},

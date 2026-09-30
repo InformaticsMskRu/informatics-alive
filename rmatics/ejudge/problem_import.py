@@ -1,10 +1,13 @@
 """Import a problem from a judge through the ejudge API: create or update
 the informatics problem and route it to that judge with judges_settings.
 
-Only what the API exposes is imported (name, limits, type). The statement
-isn't: a new problem gets a placeholder, an existing one keeps its own.
+Imported are the name, limits and type, and the Polygon statement where
+ejudge has one (see rmatics.ejudge.statement). Without it a new problem
+gets a placeholder, an existing one keeps its own statement.
 """
+import base64
 import datetime
+import logging
 from collections import defaultdict
 from contextlib import contextmanager
 from typing import Dict, List, Optional, Tuple
@@ -13,10 +16,13 @@ from sqlalchemy import Text, text, type_coerce
 
 from rmatics.ejudge import ejudge_api
 from rmatics.ejudge.judges_config import JudgeConfig, get_default_judge_id
+from rmatics.ejudge.statement import Statement, fetch_statement
 from rmatics.model.base import db
 from rmatics.model.ejudge_contest import EjudgeContest
 from rmatics.model.problem import EjudgeProblem, Problem
 from rmatics.utils.moodle import get_contest_str_id
+
+logger = logging.getLogger(__name__)
 
 NO_STATEMENT = '<p>Условие пока не опубликовано...</p>'
 # a problem must not have an empty name
@@ -195,9 +201,10 @@ def import_problem(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: 
     (see index_imported_problems); an imported problem without
     judges_settings gets the entry routing to this ejudge problem."""
     ejudge_problem = ejudge_api.get_problem(judge, contest_id, prob_id)
+    statement = fetch_statement(judge, contest_id, prob_id)
     with _import_lock(judge_id, contest_id):
         index = index_imported_problems(contest_id)
-        return _import(judge, judge_id, contest_id, prob_id, ejudge_problem, index)
+        return _import(judge, judge_id, contest_id, prob_id, ejudge_problem, statement, index)
 
 
 def import_contest(judge: JudgeConfig, judge_id: int, contest_id: int) -> dict:
@@ -207,20 +214,27 @@ def import_contest(judge: JudgeConfig, judge_id: int, contest_id: int) -> dict:
     before it imported.
     """
     ejudge_problems = ejudge_api.list_problems(judge, contest_id)
+    for ejudge_problem in ejudge_problems:
+        if not isinstance(ejudge_problem.get('id'), int):
+            raise ejudge_api.EjudgeApiError(
+                f'list-problems-json failed: problem without id: {ejudge_problem!r}')
+    logger.info(f'Judge {judge_id} contest {contest_id}: {len(ejudge_problems)} problem(s) to reload')
+    # the ejudge requests are made before the lock is taken
+    statements = [fetch_statement(judge, contest_id, ejudge_problem['id'])
+                  for ejudge_problem in ejudge_problems]
+
     results = []
     with _import_lock(judge_id, contest_id):
         index = index_imported_problems(contest_id)
-        for ejudge_problem in ejudge_problems:
-            prob_id = ejudge_problem.get('id')
-            if not isinstance(prob_id, int):
-                raise ejudge_api.EjudgeApiError(
-                    f'list-problems-json failed: problem without id: {ejudge_problem!r}')
-            results.append(_import(judge, judge_id, contest_id, prob_id, ejudge_problem, index))
+        for ejudge_problem, statement in zip(ejudge_problems, statements):
+            results.append(_import(judge, judge_id, contest_id, ejudge_problem['id'],
+                                   ejudge_problem, statement, index))
     return {'problems': results}
 
 
 def _import(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: int,
-            ejudge_problem: dict, index: Dict[ProblemKey, List[EjudgeProblem]]) -> dict:
+            ejudge_problem: dict, statement: Optional[Statement],
+            index: Dict[ProblemKey, List[EjudgeProblem]]) -> dict:
     fields = problem_fields(ejudge_problem)
     entry = {'judge_id': judge_id, 'contest_id': contest_id, 'problem_id': prob_id}
 
@@ -238,11 +252,31 @@ def _import(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id: int,
     else:
         action = 'create'
         problems = [_create_problem(judge, judge_id, contest_id, prob_id, entry, fields)]
+    if statement is not None:
+        for problem in problems:
+            problem.content = statement.content_for(problem.id)
+            problem.sample_tests_html = statement.sample_tests_html
     db.session.commit()
+    logger.info(f'Judge {judge_id} contest {contest_id} problem {prob_id}: {action}d '
+                f'problem(s) {[problem.id for problem in problems]}, '
+                f'statement {"imported" if statement is not None else "not found"}')
+
+    problem_results = []
+    for problem in problems:
+        problem_result = {'id': problem.id, 'name': problem.name}
+        if statement is not None:
+            # stored by pynformatics in /moodle_probpics/<problem_id>/
+            problem_result['images'] = {
+                name: base64.b64encode(data).decode('ascii')
+                for name, data in statement.images.items()
+            }
+        problem_results.append(problem_result)
 
     return {
         'action': action,
-        'problems': [{'id': problem.id, 'name': problem.name} for problem in problems],
+        'problems': problem_results,
+        'statement': 'imported' if statement is not None else 'not found',
+        'missing_images': statement.missing_images if statement is not None else [],
         'ejudge_problem': {
             key: ejudge_problem.get(key)
             for key in ('id', 'short_name', 'long_name', 'internal_name', 'extid', 'uuid')

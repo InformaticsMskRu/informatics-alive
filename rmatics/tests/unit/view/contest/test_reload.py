@@ -1,3 +1,4 @@
+import base64
 import itertools
 from unittest import mock
 
@@ -5,7 +6,7 @@ import requests
 from flask import url_for
 from sqlalchemy import text
 
-from rmatics.ejudge import ejudge_api, problem_import
+from rmatics.ejudge import ejudge_api, problem_import, statement
 from rmatics.model.base import db
 from rmatics.model.ejudge_contest import EjudgeContest
 from rmatics.model.problem import EjudgeProblem, Problem
@@ -35,6 +36,20 @@ def reply(payload, status_code=200):
     return resp
 
 
+def file_reply(content_type, body):
+    return mock.Mock(status_code=200, headers={'Content-Type': content_type}, content=body)
+
+
+# what get-file answers for a file missing from attachments/
+ERROR_PAGE = file_reply('text/html; charset=utf-8', b'<html><body>Operation failed</body></html>')
+
+STATEMENT_HTML = """<html><body><div class="problem-statement">
+<div class="header"><div class="title">C. Sum</div></div>
+<div class="legend"><p>Find $$$a+b$$$.</p><img class="tex-graphics" src="pic.png"/></div>
+<div class="sample-tests"><div class="section-title">Examples</div><pre>1 2</pre></div>
+</div></body></html>""".encode()
+
+
 class TestReloadProblem(TestCase):
     def setUp(self):
         super().setUp()
@@ -45,6 +60,8 @@ class TestReloadProblem(TestCase):
             dict(EJUDGE_PROBLEM, id=2, long_name='Second'),
         ]
         self.contest_name = 'Contest 2395'
+        # attachments/ of every ejudge problem: name -> reply
+        self.attachments = {}
 
         # the test schema has no AUTO_INCREMENT on the composite primary
         # keys, so the rows get explicit ids
@@ -67,6 +84,8 @@ class TestReloadProblem(TestCase):
             return reply({'ok': True, 'problems': self.contest_problems})
         if params['action'] == 'contest-status-json':
             return reply({'ok': True, 'result': {'contest': {'name': self.contest_name}}})
+        if params['action'] == 'get-file':
+            return self.attachments.get(params['file'], ERROR_PAGE)
         raise AssertionError(f'unexpected action {params["action"]}')
 
     def send_request(self, judge_id=OTHER_JUDGE, contest_id=CONTEST, problem_id=PROB,
@@ -80,7 +99,10 @@ class TestReloadProblem(TestCase):
         with mock.patch.object(ejudge_api.requests, 'get',
                                side_effect=ejudge_get or self.ejudge_get) as get:
             resp = self.client.post(url)
-        self.ejudge_calls = [call[1]['params']['action'] for call in get.call_args_list]
+        self.ejudge_calls = [call[1]['params']['action'] for call in get.call_args_list
+                             if call[1]['params']['action'] != 'get-file']
+        self.fetched_files = [call[1]['params']['file'] for call in get.call_args_list
+                              if call[1]['params']['action'] == 'get-file']
         db.session.expire_all()
         return resp
 
@@ -391,6 +413,60 @@ class TestReloadProblem(TestCase):
 
         with mock.patch.object(problem_import, 'IMPORT_LOCK_TIMEOUT', 0):
             self.assert200(self.send_request(judge_id=DEFAULT_JUDGE))
+
+    def add_statement(self):
+        self.attachments = {
+            statement.STATEMENT_FILE: file_reply('text/html', STATEMENT_HTML),
+            'pic.png': file_reply('image/png', b'PNG'),
+        }
+
+    def test_statement_of_created_problem(self):
+        self.add_statement()
+
+        resp = self.send_request()
+
+        self.assert200(resp)
+        data = resp.json['data']
+        self.assertEqual((data['statement'], data['missing_images']), ('imported', []))
+        result, = data['problems']
+        self.assertEqual(result['images'], {'pic.png': base64.b64encode(b'PNG').decode()})
+        problem = self.get_problem(result['id'])
+        self.assertIn(f'src="/moodle_probpics/{problem.id}/pic.png"', problem.content)
+        self.assertIn('Find \\(a+b\\).', problem.content)
+        self.assertNotIn('C. Sum', problem.content)
+        self.assertNotIn('1 2', problem.content)
+        self.assertIn('1 2', problem.sample_tests_html)
+
+    def test_statement_replaces_content_of_updated_problem(self):
+        existing = self.create_problem(1, judges_settings=[
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}])
+        self.add_statement()
+
+        resp = self.send_request()
+
+        self.assertEqual(resp.json['data']['action'], 'update')
+        self.assertIn(f'/moodle_probpics/{existing.id}/pic.png', self.get_problem(existing.id).content)
+
+    def test_no_statement_keeps_content(self):
+        existing = self.create_problem(1, judges_settings=[
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}])
+
+        resp = self.send_request()
+
+        data = resp.json['data']
+        self.assertEqual(data['statement'], 'not found')
+        self.assertNotIn('images', data['problems'][0])
+        self.assertEqual(self.get_problem(existing.id).content, '<p>kept</p>')
+
+    def test_contest_fetches_every_statement(self):
+        self.add_statement()
+
+        resp = self.send_request(problem_id=None)
+
+        self.assert200(resp)
+        self.assertEqual([r['statement'] for r in resp.json['data']['problems']],
+                         ['imported', 'imported'])
+        self.assertEqual(self.fetched_files, ['problem.html', 'pic.png'] * 2)
 
     def test_get_is_not_allowed(self):
         url = url_for('contest.ejudge_reload_problem', judge_id=OTHER_JUDGE,

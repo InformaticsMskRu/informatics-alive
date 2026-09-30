@@ -4,6 +4,8 @@ import problems.
 Replies are {"ok": true, ...} on success and
 {"ok": false, "error": {"num", "symbol", "message"}} on failure.
 """
+from typing import Tuple
+
 import requests
 
 from rmatics.ejudge.judges_config import JudgeConfig
@@ -65,6 +67,26 @@ def list_problems(judge: JudgeConfig, contest_id: int) -> list:
     if not isinstance(problems, list):
         raise EjudgeApiError('list-problems-json failed: no problems in the reply')
     return problems
+
+
+def get_file(judge: JudgeConfig, contest_id: int, prob_id: int, name: str) -> Tuple[str, bytes]:
+    """A file of the problem's attachments/ directory: (content type, bytes).
+
+    ejudge answers a missing file with its HTML error page, not an error
+    status: the caller checks the content.
+    """
+    try:
+        resp = requests.get(
+            judge.url,
+            params={'action': 'get-file', 'contest_id': contest_id,
+                    'prob_id': prob_id, 'file': name},
+            headers={'Authorization': 'Bearer ' + judge.get_token()},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        raise EjudgeApiError(f'get-file {name} failed: {e}') from e
+    content_type = resp.headers.get('Content-Type', '').split(';')[0].strip().lower()
+    return content_type, resp.content
 
 
 def get_contest_name(judge: JudgeConfig, contest_id: int) -> str:
