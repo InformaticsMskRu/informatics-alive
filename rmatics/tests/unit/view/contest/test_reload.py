@@ -437,15 +437,59 @@ class TestReloadProblem(TestCase):
         self.assertNotIn('1 2', problem.content)
         self.assertIn('1 2', problem.sample_tests_html)
 
+    def assert_statement_imported(self, problem_id, problem_result):
+        problem = self.get_problem(problem_id)
+        self.assertNotIn('kept', problem.content)
+        self.assertIn('Find \\(a+b\\).', problem.content)
+        self.assertIn(f'src="/moodle_probpics/{problem_id}/pic.png"', problem.content)
+        self.assertNotIn('1 2', problem.content)
+        self.assertIn('1 2', problem.sample_tests_html)
+        # the images come back for pynformatics to store
+        self.assertEqual(problem_result, {'id': problem_id, 'name': 'Sum',
+                                          'images': {'pic.png': base64.b64encode(b'PNG').decode()}})
+
     def test_statement_replaces_content_of_updated_problem(self):
         existing = self.create_problem(1, judges_settings=[
             {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}])
         self.add_statement()
 
-        resp = self.send_request()
+        data = self.send_request().json['data']
 
-        self.assertEqual(resp.json['data']['action'], 'update')
-        self.assertIn(f'/moodle_probpics/{existing.id}/pic.png', self.get_problem(existing.id).content)
+        self.assertEqual((data['action'], data['statement']), ('update', 'imported'))
+        self.assert_statement_imported(existing.id, data['problems'][0])
+        self.assert_logged(data['log'], f'problem 3: problem {existing.id} statement and samples replaced')
+
+    def test_statement_of_every_updated_problem(self):
+        entry = {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}
+        first = self.create_problem(1, judges_settings=[entry])
+        second = self.create_problem(2, judges_settings=[entry])
+        self.add_statement()
+
+        data = self.send_request().json['data']
+
+        # each problem links the images in its own directory
+        self.assert_statement_imported(first.id, data['problems'][0])
+        self.assert_statement_imported(second.id, data['problems'][1])
+
+    def test_statement_of_updated_legacy_problem(self):
+        existing = self.create_problem(1, ejudge_contest_id=CONTEST, problem_id=PROB)
+        self.add_statement()
+
+        data = self.send_request(judge_id=DEFAULT_JUDGE).json['data']
+
+        self.assertEqual(data['action'], 'update')
+        self.assert_statement_imported(existing.id, data['problems'][0])
+
+    def test_statement_of_problem_updated_by_contest_reload(self):
+        self.contest_problems = [dict(EJUDGE_PROBLEM)]
+        existing = self.create_problem(1, judges_settings=[
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}])
+        self.add_statement()
+
+        result, = self.send_request(problem_id=None).json['data']['problems']
+
+        self.assertEqual((result['action'], result['statement']), ('update', 'imported'))
+        self.assert_statement_imported(existing.id, result['problems'][0])
 
     def test_no_statement_keeps_content(self):
         existing = self.create_problem(1, judges_settings=[
