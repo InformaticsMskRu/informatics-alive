@@ -229,6 +229,16 @@ class TestReloadProblem(TestCase):
 
         self.assertEqual(resp.json['data']['action'], 'create')
 
+    def test_entries_per_language_list_the_problem_once(self):
+        existing = self.create_problem(1, judges_settings=[
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB, 'lang_ids': [3]},
+            {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB, 'lang_ids': [27]},
+        ])
+
+        resp = self.send_request()
+
+        self.assertEqual(resp.json['data']['problems'], [{'id': existing.id, 'name': 'Sum'}])
+
     def test_updates_every_mapped_problem(self):
         entry = {'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}
         first = self.create_problem(1, judges_settings=[entry])
@@ -245,8 +255,8 @@ class TestReloadProblem(TestCase):
         resp = self.send_request()
 
         problem = self.get_problem(resp.json['data']['problems'][0]['id'])
-        # an empty name is replaced as the filesystem reload does
-        self.assertEqual((problem.name, problem.ejudge_name), (' ', ''))
+        # a problem must not have an empty name
+        self.assertEqual((problem.name, problem.ejudge_name), (problem_import.NO_NAME, ''))
         self.assertEqual(problem.timelimit, 2)
         self.assertIsNone(problem.memorylimit)
         self.assertTrue(problem.output_only)
