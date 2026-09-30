@@ -16,9 +16,9 @@ OTHER_JUDGE = 2
 CONTEST = 2395
 PROB = 3
 
+# a get-problem-json reply: ejudge doesn't serialize short_name (a char[] field)
 EJUDGE_PROBLEM = {
     'id': PROB,
-    'short_name': 'C',
     'long_name': 'Sum',
     'internal_name': 'sum',
     'extid': 'polygon:123',
@@ -41,8 +41,8 @@ class TestReloadProblem(TestCase):
         self.create_judges()  # judge 1 is the default one
         self.ejudge_problem = dict(EJUDGE_PROBLEM)
         self.contest_problems = [
-            dict(EJUDGE_PROBLEM, id=1, short_name='A', long_name='First'),
-            dict(EJUDGE_PROBLEM, id=2, short_name='B', long_name='Second'),
+            dict(EJUDGE_PROBLEM, id=1, long_name='First'),
+            dict(EJUDGE_PROBLEM, id=2, long_name='Second'),
         ]
         self.contest_name = 'Contest 2395'
 
@@ -85,11 +85,12 @@ class TestReloadProblem(TestCase):
         return resp
 
     def create_problem(self, ejudge_prid, ejudge_contest_id=0, problem_id=0,
-                       judges_settings=None, name='Old'):
+                       judges_settings=None, name='Old', short_id='X'):
         return EjudgeProblem.create(
             ejudge_prid=ejudge_prid, contest_id=0, ejudge_contest_id=ejudge_contest_id,
             problem_id=problem_id, judges_settings=judges_settings, name=name,
-            ejudge_name=name, timelimit=1, memorylimit=1024, content='<p>kept</p>',
+            ejudge_name=name, short_id=short_id, timelimit=1, memorylimit=1024,
+            content='<p>kept</p>',
         )
 
     def set_raw_settings(self, problem, raw):
@@ -118,8 +119,8 @@ class TestReloadProblem(TestCase):
         problem = self.get_problem(data['problems'][0]['id'])
         self.assertEqual(problem.judges_settings,
                          [{'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': PROB}])
-        self.assertEqual((problem.name, problem.ejudge_name, problem.short_id),
-                         ('Sum', 'Sum', 'C'))
+        self.assertEqual((problem.name, problem.ejudge_name), ('Sum', 'Sum'))
+        self.assertIsNone(problem.short_id)
         self.assertEqual(problem.timelimit, 1.5)
         self.assertEqual(problem.memorylimit, 268435456)
         self.assertFalse(problem.output_only)
@@ -249,8 +250,24 @@ class TestReloadProblem(TestCase):
         self.assertEqual([p['id'] for p in resp.json['data']['problems']],
                          [first.id, second.id])
 
+    def test_update_keeps_short_id_ejudge_does_not_send(self):
+        existing = self.create_problem(1, ejudge_contest_id=CONTEST, problem_id=PROB, short_id='C')
+
+        resp = self.send_request(judge_id=DEFAULT_JUDGE)
+
+        self.assertEqual(resp.json['data']['action'], 'update')
+        self.assertEqual(self.get_problem(existing.id).short_id, 'C')
+
+    def test_short_name_is_used_when_sent(self):
+        self.ejudge_problem = dict(EJUDGE_PROBLEM, short_name='D')
+        existing = self.create_problem(1, ejudge_contest_id=CONTEST, problem_id=PROB, short_id='C')
+
+        self.send_request(judge_id=DEFAULT_JUDGE)
+
+        self.assertEqual(self.get_problem(existing.id).short_id, 'D')
+
     def test_problem_fields(self):
-        self.ejudge_problem = {'short_name': 'D', 'type': 'output-only', 'time_limit': 2}
+        self.ejudge_problem = {'type': 'output-only', 'time_limit': 2}
 
         resp = self.send_request()
 
@@ -289,7 +306,7 @@ class TestReloadProblem(TestCase):
                          [(1, 'create'), (2, 'update')])
         self.assertEqual(results[1]['problems'], [{'id': existing.id, 'name': 'Second'}])
         created = self.get_problem(results[0]['problems'][0]['id'])
-        self.assertEqual((created.name, created.short_id), ('First', 'A'))
+        self.assertEqual(created.name, 'First')
         self.assertEqual(created.judges_settings,
                          [{'judge_id': OTHER_JUDGE, 'contest_id': CONTEST, 'problem_id': 1}])
         # the listed problems are used as is, without a request per problem
@@ -321,7 +338,7 @@ class TestReloadProblem(TestCase):
         self.assert404(resp)
 
     def test_contest_problem_without_id(self):
-        self.contest_problems = [{'short_name': 'A'}]
+        self.contest_problems = [{'long_name': 'No id'}]
 
         resp = self.send_request(problem_id=None)
 
