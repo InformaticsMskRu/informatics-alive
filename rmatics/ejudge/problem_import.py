@@ -63,14 +63,19 @@ def problem_fields(ejudge_problem: dict) -> dict:
         timelimit = ejudge_problem['time_limit_millis'] / 1000
     else:
         timelimit = ejudge_problem.get('time_limit', -1)
-    return {
+    fields = {
         'name': long_name or NO_NAME,
         'ejudge_name': long_name,
-        'short_id': ejudge_problem.get('short_name'),
         'timelimit': timelimit,
         'memorylimit': ejudge_problem.get('max_vm_size'),
         'output_only': ejudge_problem.get('type') == 'output-only',
     }
+    # ejudge doesn't serialize fixed-size string fields and short_name is
+    # one (char[32]): without it an existing short id is kept, a new
+    # problem gets none
+    if ejudge_problem.get('short_name'):
+        fields['short_id'] = ejudge_problem['short_name']
+    return fields
 
 
 def _entry_key(entry) -> Optional[ProblemKey]:
@@ -163,7 +168,7 @@ def _create_problem(judge: JudgeConfig, judge_id: int, contest_id: int, prob_id:
 
     ejudge_prid = _insert_row(EjudgeProblem.__table__, {
         **legacy,
-        'short_id': fields['short_id'],
+        'short_id': fields.get('short_id'),
         'name': fields['ejudge_name'],
         'judges_settings': [entry],
     })
