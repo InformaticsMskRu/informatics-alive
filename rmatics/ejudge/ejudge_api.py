@@ -30,9 +30,12 @@ def _call(judge: JudgeConfig, contest_id: int, action: str, **params) -> dict:
             headers={'Authorization': 'Bearer ' + judge.get_token()},
             timeout=REQUEST_TIMEOUT,
         )
-        data = resp.json()
-    except (requests.RequestException, ValueError) as e:
+    except requests.RequestException as e:
         raise EjudgeApiError(f'{action} failed: {e}') from e
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise EjudgeApiError(f'{action} failed: {_describe_non_json(resp)}') from e
 
     if not isinstance(data, dict):
         raise EjudgeApiError(f'{action} failed: unexpected reply')
@@ -45,6 +48,17 @@ def _call(judge: JudgeConfig, contest_id: int, action: str, **params) -> dict:
             raise EjudgeNotFound(message)
         raise EjudgeApiError(message)
     return data
+
+
+_BODY_SNIPPET = 200
+
+
+def _describe_non_json(resp) -> str:
+    # e.g. an ejudge without the action replies with an HTML page
+    body = resp.content[:_BODY_SNIPPET].decode('utf-8', 'replace')
+    return (f'not a JSON reply: HTTP {resp.status_code}, '
+            f'{resp.headers.get("Content-Type") or "no content type"}, '
+            f'{len(resp.content)} bytes: {body!r}')
 
 
 def get_problem(judge: JudgeConfig, contest_id: int, prob_id: int) -> dict:
