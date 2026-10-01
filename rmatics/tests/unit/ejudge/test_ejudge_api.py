@@ -108,10 +108,24 @@ class TestEjudgeApi(unittest.TestCase):
         self.assertIn('ERR_PERMISSION_DENIED', str(ctx.exception))
 
     def test_non_json_reply(self):
-        resp = reply(None)
-        resp.json.side_effect = ValueError('no json')
-        with self.assertRaises(EjudgeApiError):
+        resp = mock.Mock(status_code=200, headers={'Content-Type': 'text/html; charset=utf-8'},
+                         content=b'<html><title>Invalid action</title>' + b'x' * 300)
+        resp.json.side_effect = ValueError('Expecting value: line 1 column 1 (char 0)')
+        with self.assertRaises(EjudgeApiError) as ctx:
             self.call(ejudge_api.get_problem, 2395, 3, resp=resp)
+
+        message = str(ctx.exception)
+        self.assertIn("get-problem-json failed: not a JSON reply: HTTP 200, text/html; charset=utf-8, "
+                      "335 bytes: '<html><title>Invalid action</title>xxx", message)
+        self.assertLess(len(message), 350)
+
+    def test_empty_reply(self):
+        resp = mock.Mock(status_code=502, headers={}, content=b'')
+        resp.json.side_effect = ValueError('Expecting value: line 1 column 1 (char 0)')
+        with self.assertRaises(EjudgeApiError) as ctx:
+            self.call(ejudge_api.get_problem, 2395, 3, resp=resp)
+
+        self.assertIn("not a JSON reply: HTTP 502, no content type, 0 bytes: ''", str(ctx.exception))
 
     def test_connection_error(self):
         with self.assertRaises(EjudgeApiError):
