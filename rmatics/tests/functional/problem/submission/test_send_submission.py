@@ -111,50 +111,6 @@ class TestAPIProblemSubmission(TestCase):
         self.assertEqual(resp.json['error'], f'Language 1 is not supported for problem {problem.id}')
         self.assertEqual(db.session.query(Run).count(), 0)
 
-    def test_statement_allowed_languages(self):
-        statement = self.statements[0]
-        statement.settings = {'allowed_languages': [27]}
-        db.session.commit()
-        problem_id = self.ejudge_problems[1].id
-
-        resp = self.send_request(problem_id, lang_id=1, statement_id=statement.id)
-        self.assert400(resp)
-        self.assertEqual(resp.json['error_code'], 'language_not_allowed')
-        self.assertEqual(resp.json['error'], f'Language 1 is not allowed in statement {statement.id}')
-        self.assertEqual(db.session.query(Run).count(), 0)
-        self.assert200(self.send_request(problem_id, lang_id=27, statement_id=statement.id))
-
-    def test_context_id_is_the_statement(self):
-        statement = self.statements[0]
-        statement.settings = {'allowed_languages': [27]}
-        db.session.commit()
-
-        resp = self.send_request(self.ejudge_problems[1].id, lang_id=1,
-                                 statement_id=self.statements[1].id,
-                                 context_id=statement.id)
-
-        self.assert400(resp)
-
-    def test_statement_without_allowed_languages(self):
-        self.statements[0].settings = {'allowed_languages': []}
-        db.session.commit()
-
-        resp = self.send_request(self.ejudge_problems[1].id, lang_id=1,
-                                 statement_id=self.statements[0].id)
-
-        self.assert200(resp)
-
-    def test_output_only_skips_allowed_languages(self):
-        statement = self.statements[0]
-        statement.settings = {'allowed_languages': [27]}
-        problem = self.ejudge_problems[1]
-        problem.output_only = True
-        db.session.commit()
-
-        resp = self.send_request(problem.id, lang_id=0, statement_id=statement.id)
-
-        self.assert200(resp)
-
     def test_output_only_lang_id_is_stored_as_0(self):
         problem = self.ejudge_problems[1]
         problem.output_only = True

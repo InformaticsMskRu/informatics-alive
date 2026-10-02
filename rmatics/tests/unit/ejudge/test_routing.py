@@ -1,7 +1,7 @@
 from unittest import mock
 
 from rmatics.ejudge.judges_config import JudgeLang
-from rmatics.ejudge.routing import Route, resolve_route
+from rmatics.ejudge.routing import AvailableLanguage, Route, available_languages, resolve_route
 from rmatics.utils.exceptions import LanguageNotSupported
 from rmatics.testutils import TestCase
 
@@ -136,3 +136,58 @@ class TestResolveRoute(TestCase):
                              'user_ids': [USER]}])
         with self.assertRaises(LanguageNotSupported):
             resolve_route(problem, 27, OTHER_USER)
+
+
+class TestAvailableLanguages(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.create_judges()
+
+    def ids(self, problem):
+        return [lang.id for lang in available_languages(problem, USER)]
+
+    def test_no_settings_lists_default_judge_langs_with_names(self):
+        self.assertEqual(available_languages(_problem(), USER), [
+            AvailableLanguage(1, 'Free Pascal 3.0'),
+            AvailableLanguage(3, 'GNU C++ 11.2'),
+            AvailableLanguage(27, 'Python 3.9'),
+        ])
+
+    def test_no_settings_ignores_langs_only_other_judges_have(self):
+        self.judges[1].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        self.assertEqual(self.ids(_problem()), [3])
+
+    def test_languages_come_from_the_routed_judge(self):
+        self.judges[2].langs = {71: JudgeLang('Kotlin 1.9', 71)}
+        self.judges[1].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6}])
+        self.assertEqual(available_languages(problem, USER),
+                         [AvailableLanguage(71, 'Kotlin 1.9')])
+
+    def test_lang_ids_narrow_the_judge_langs(self):
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
+                             'lang_ids': [3, 27]}])
+        self.assertEqual(self.ids(problem), [3, 27])
+
+    def test_user_ids_restrict_the_entry(self):
+        problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
+                             'user_ids': [OTHER_USER]}])
+        self.assertEqual(self.ids(problem), [])
+
+    def test_entry_with_unknown_judge_is_left_out(self):
+        problem = _problem([{'judge_id': 99, 'contest_id': 500, 'problem_id': 6}])
+        self.assertEqual(self.ids(problem), [])
+
+    def test_no_default_judge_in_config_lists_nothing(self):
+        self.app.config['DEFAULT_JUDGE_ID'] = 99
+        self.assertEqual(self.ids(_problem()), [])
+
+    def test_output_only(self):
+        problem = _problem(output_only=True)
+        self.assertEqual(available_languages(problem, USER),
+                         [AvailableLanguage(0, None)])
+
+    def test_output_only_unroutable(self):
+        problem = _problem([{'judge_id': 2, 'contest_id': 5, 'problem_id': 6,
+                             'user_ids': [OTHER_USER]}], output_only=True)
+        self.assertEqual(self.ids(problem), [])

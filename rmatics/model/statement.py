@@ -110,16 +110,6 @@ class Statement(CourseModuleInstance, db.Model):
     }
     SETTINGS_SCHEMA_VALIDATOR = Draft4Validator(SETTINGS_SCHEMA)
 
-    def get_allowed_languages(self):
-        if not (self.settings and 'allowed_languages' in self.settings):
-            return None
-        return self.settings['allowed_languages']
-
-    def is_language_allowed(self, lang_id: int) -> bool:
-        # an empty list is treated as "not set", not as "nothing allowed"
-        allowed = self.get_allowed_languages()
-        return not allowed or lang_id in allowed
-
     def set_settings(self, settings):
         validation_error = next(self.SETTINGS_SCHEMA_VALIDATOR.iter_errors(settings), None)
         if validation_error:

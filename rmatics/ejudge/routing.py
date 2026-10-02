@@ -1,9 +1,12 @@
 """Choosing the judge a run is sent to (judges_settings of the problem)."""
-from typing import NamedTuple, Optional
+from typing import List, NamedTuple, Optional
 
 from celery.utils.log import get_task_logger
 
+from flask import current_app
+
 from rmatics.ejudge.judges_config import get_default_judge_id, get_judge
+from rmatics.utils.constants import OUTPUT_ONLY_LANG_ID
 from rmatics.utils.exceptions import LanguageNotSupported
 
 logger = get_task_logger(__name__)
@@ -134,3 +137,44 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
             f'Language {lang_id} is not supported for problem {problem.id}'
         )
     return route
+
+
+class AvailableLanguage(NamedTuple):
+    id: int
+    # None for output-only problems: the answer is a text file, not a language
+    name: Optional[str]
+
+
+def available_languages(problem, user_id: int) -> List[AvailableLanguage]:
+    """Languages a run of user_id can be submitted in.
+
+    A language is listed when resolve_route accepts it and its judge is in the
+    config (submit_task fails runs routed to an unknown judge), named as the
+    judge it is routed to names it. Candidates are the languages of all judges,
+    in config order. A statement's allowed_languages is not rmatics' concern:
+    the client narrows the list and checks it on submit.
+    """
+    if problem.output_only:
+        candidates = [OUTPUT_ONLY_LANG_ID]
+    else:
+        candidates = list(dict.fromkeys(
+            lang_id
+            for judge in current_app.extensions.get('judges', {}).values()
+            for lang_id in judge.langs
+        ))
+
+    result = []
+    for lang_id in candidates:
+        try:
+            route = resolve_route(problem, lang_id, user_id)
+        except LanguageNotSupported:
+            continue
+        judge = get_judge(route.judge_id)
+        if judge is None:
+            continue
+        if problem.output_only:
+            name = None
+        else:
+            name = judge.langs[lang_id].name
+        result.append(AvailableLanguage(lang_id, name))
+    return result
