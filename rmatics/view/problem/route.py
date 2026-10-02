@@ -1,7 +1,7 @@
 from flask import Blueprint
 
 from rmatics.utils.auth import require_judge_token
-from rmatics.view.problem.problem import TrustedSubmitApi, ProblemApi, ProblemLanguagesApi, ProblemSubmissionsFilterApi
+from rmatics.view.problem.problem import TrustedSubmitApi, ProblemApi, ProblemSubmissionsFilterApi
 from rmatics.view.problem.run import SourceApi, UpdateRunFromEjudgeAPIv1, UpdateRunFromEjudgeAPIv2, ProtocolApi, RunAPI, RunStatusApi
 
 problem_blueprint = Blueprint('problem', __name__, url_prefix='/problem')
@@ -11,9 +11,6 @@ problem_blueprint.add_url_rule('/trusted/<int:problem_id>/submit_v2', methods=('
 
 problem_blueprint.add_url_rule('/<int:problem_id>', methods=('GET', ),
                                view_func=ProblemApi.as_view('problem'))
-
-problem_blueprint.add_url_rule('/<int:problem_id>/languages', methods=('GET', ),
-                               view_func=ProblemLanguagesApi.as_view('problem_languages'))
 
 problem_blueprint.add_url_rule('/<int:problem_id>/submissions/', methods=('GET', 'POST', ),
                                view_func=ProblemSubmissionsFilterApi.as_view('problem_submissions'))

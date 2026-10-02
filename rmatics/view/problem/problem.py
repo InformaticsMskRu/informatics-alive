@@ -152,7 +152,13 @@ class TrustedSubmitApi(MethodView):
 
 
 class ProblemApi(MethodView):
+    get_args = {
+        # with it, the languages the user can submit the problem in are added
+        'user_id': fields.Integer(required=False),
+    }
+
     def get(self, problem_id: int):
+        args = parser.parse(self.get_args, request)
         problem = db.session.query(EjudgeProblem).get(problem_id)
         if not problem:
             raise NotFound('Problem with this id is not found')
@@ -162,27 +168,13 @@ class ProblemApi(MethodView):
         else:
             schema = ProblemSchema()
 
-        data = schema.dump(problem)
-        return jsonify(data.data)
-
-
-class ProblemLanguagesApi(MethodView):
-    """Languages the user can submit this problem in (see available_languages).
-
-    Not narrowed by the statement's allowed_languages: the client does that.
-    """
-    get_args = {
-        'user_id': fields.Integer(required=True),
-    }
-
-    def get(self, problem_id: int):
-        args = parser.parse(self.get_args, request)
-        problem = db.session.query(EjudgeProblem).filter_by(id=problem_id).one_or_none()
-        if not problem:
-            raise NotFound('Problem with this id is not found')
-
-        languages = available_languages(problem, args['user_id'])
-        return jsonify([language._asdict() for language in languages])
+        data = schema.dump(problem).data
+        if args.get('user_id') is not None:
+            # not narrowed by the statement's allowed_languages: the client does that
+            data['languages'] = [
+                language._asdict() for language in available_languages(problem, args['user_id'])
+            ]
+        return jsonify(data)
 
 
 get_args = {

@@ -14,32 +14,37 @@ class TestProblemLanguages(TestCase):
         self.problem_id = self.ejudge_problems[0].id
 
     def get(self, problem_id=None, **params):
-        route = url_for('problem.problem_languages', problem_id=problem_id or self.problem_id)
+        route = url_for('problem.problem', problem_id=problem_id or self.problem_id)
         return self.client.get(route, query_string=params)
 
     def test_lists_languages(self):
         response = self.get(user_id=1)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['data'], [
+        self.assertEqual(response.json['data']['languages'], [
             {'id': 1, 'name': 'Free Pascal 3.0'},
             {'id': 3, 'name': 'GNU C++ 11.2'},
             {'id': 27, 'name': 'Python 3.9'},
         ])
+        self.assertEqual(response.json['data']['id'], self.problem_id)
+
+    def test_languages_only_with_user_id(self):
+        response = self.get()
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('languages', response.json['data'])
 
     def test_statement_allowed_languages_are_not_applied(self):
         statement = self.statements[0]
         statement.settings = {'allowed_languages': [27]}
         db.session.commit()
         response = self.get(user_id=1, statement_id=statement.id)
-        self.assertEqual([lang['id'] for lang in response.json['data']], [1, 3, 27])
-
-    def test_unknown_problem(self):
-        self.assertEqual(self.get(problem_id=99999, user_id=1).status_code, 404)
-
-    def test_user_id_is_required(self):
-        self.assertEqual(self.get().status_code, 422)
+        self.assertEqual([lang['id'] for lang in response.json['data']['languages']],
+                         [1, 3, 27])
 
     def test_output_only_language_has_no_name(self):
         self.ejudge_problems[0].output_only = True
         db.session.commit()
-        self.assertEqual(self.get(user_id=1).json['data'], [{'id': 0, 'name': None}])
+        self.assertEqual(self.get(user_id=1).json['data']['languages'],
+                         [{'id': 0, 'name': None}])
+
+    def test_unknown_problem(self):
+        self.assertEqual(self.get(problem_id=99999, user_id=1).status_code, 404)
