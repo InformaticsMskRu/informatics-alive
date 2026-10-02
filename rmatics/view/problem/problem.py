@@ -181,11 +181,13 @@ class ProblemApi(MethodView):
 
 
 class ProblemLanguagesApi(MethodView):
-    """Languages the user can submit this problem in (see available_languages)."""
+    """Languages the user can submit this problem in (see available_languages).
+
+    Not narrowed by the statement's allowed_languages: the caller does that,
+    and submit enforces it.
+    """
     get_args = {
         'user_id': fields.Integer(required=True),
-        'statement_id': fields.Integer(required=False),
-        'context_id': fields.Integer(required=False),
     }
 
     def get(self, problem_id: int):
@@ -194,10 +196,7 @@ class ProblemLanguagesApi(MethodView):
         if not problem:
             raise NotFound('Problem with this id is not found')
 
-        # same statement as the one checked on submit
-        statement_id = args.get('context_id') or args.get('statement_id')
-        statement = db.session.query(Statement).get(statement_id) if statement_id else None
-        languages = available_languages(problem, args['user_id'], statement)
+        languages = available_languages(problem, args['user_id'])
         return jsonify([language._asdict() for language in languages])
 
 

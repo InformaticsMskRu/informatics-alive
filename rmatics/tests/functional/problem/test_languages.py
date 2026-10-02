@@ -26,19 +26,12 @@ class TestProblemLanguages(TestCase):
             {'id': 27, 'name': 'Python 3.9'},
         ])
 
-    def test_statement_restricts_languages(self):
+    def test_statement_allowed_languages_are_not_applied(self):
         statement = self.statements[0]
         statement.settings = {'allowed_languages': [27]}
         db.session.commit()
         response = self.get(user_id=1, statement_id=statement.id)
-        self.assertEqual([lang['id'] for lang in response.json['data']], [27])
-
-    def test_context_id_wins_over_statement_id(self):
-        self.statements[1].settings = {'allowed_languages': [3]}
-        db.session.commit()
-        response = self.get(user_id=1, statement_id=self.statements[0].id,
-                            context_id=self.statements[1].id)
-        self.assertEqual([lang['id'] for lang in response.json['data']], [3])
+        self.assertEqual([lang['id'] for lang in response.json['data']], [1, 3, 27])
 
     def test_unknown_problem(self):
         self.assertEqual(self.get(problem_id=99999, user_id=1).status_code, 404)

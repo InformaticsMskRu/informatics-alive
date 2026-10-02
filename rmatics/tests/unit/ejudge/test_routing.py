@@ -2,7 +2,6 @@ from unittest import mock
 
 from rmatics.ejudge.judges_config import JudgeLang
 from rmatics.ejudge.routing import AvailableLanguage, Route, available_languages, resolve_route
-from rmatics.model.statement import Statement
 from rmatics.utils.exceptions import LanguageNotSupported
 from rmatics.testutils import TestCase
 
@@ -144,8 +143,8 @@ class TestAvailableLanguages(TestCase):
         super().setUp()
         self.create_judges()
 
-    def ids(self, problem, statement=None):
-        return [lang.id for lang in available_languages(problem, USER, statement)]
+    def ids(self, problem):
+        return [lang.id for lang in available_languages(problem, USER)]
 
     def test_no_settings_lists_default_judge_langs_with_names(self):
         self.assertEqual(available_languages(_problem(), USER), [
@@ -183,18 +182,9 @@ class TestAvailableLanguages(TestCase):
         self.app.config['DEFAULT_JUDGE_ID'] = 99
         self.assertEqual(self.ids(_problem()), [])
 
-    def test_statement_allowed_languages_intersect(self):
-        statement = Statement(settings={'allowed_languages': [3, 71]})
-        self.assertEqual(self.ids(_problem(), statement), [3])
-
-    def test_statement_without_allowed_languages_keeps_all(self):
-        self.assertEqual(self.ids(_problem(), Statement(settings={'allowed_languages': []})),
-                         [1, 3, 27])
-
     def test_output_only(self):
         problem = _problem(output_only=True)
-        statement = Statement(settings={'allowed_languages': [27]})
-        self.assertEqual(available_languages(problem, USER, statement),
+        self.assertEqual(available_languages(problem, USER),
                          [AvailableLanguage(0, None)])
 
     def test_output_only_unroutable(self):

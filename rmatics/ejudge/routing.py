@@ -145,14 +145,14 @@ class AvailableLanguage(NamedTuple):
     name: Optional[str]
 
 
-def available_languages(problem, user_id: int, statement=None) -> List[AvailableLanguage]:
+def available_languages(problem, user_id: int) -> List[AvailableLanguage]:
     """Languages a run of user_id can be submitted in.
 
     A language is listed when resolve_route accepts it and its judge is in the
     config (submit_task fails runs routed to an unknown judge), named as the
-    judge it is routed to names it. If the statement restricts languages
-    (allowed_languages), only those are kept. Candidates are the languages of
-    all judges, in config order.
+    judge it is routed to names it. Candidates are the languages of all judges,
+    in config order. The statement's allowed_languages is not applied here:
+    the caller narrows the list, and submit enforces it.
     """
     if problem.output_only:
         candidates = [OUTPUT_ONLY_LANG_ID]
@@ -174,8 +174,6 @@ def available_languages(problem, user_id: int, statement=None) -> List[Available
             continue
         if problem.output_only:
             name = None
-        elif statement is not None and not statement.is_language_allowed(lang_id):
-            continue
         else:
             name = judge.langs[lang_id].name
         result.append(AvailableLanguage(lang_id, name))
