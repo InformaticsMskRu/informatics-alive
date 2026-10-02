@@ -155,6 +155,9 @@ class ProblemApi(MethodView):
     get_args = {
         # with it, the languages the user can submit the problem in are added
         'user_id': fields.Integer(required=False),
+        # comma-separated fields of the problem to leave out, e.g. the
+        # sample tests, which are read from disk on every call
+        'exclude': fields.String(required=False),
     }
 
     def get(self, problem_id: int):
@@ -163,12 +166,14 @@ class ProblemApi(MethodView):
         if not problem:
             raise NotFound('Problem with this id is not found')
 
+        exclude = {name for name in (args.get('exclude') or '').split(',') if name}
+        unknown = exclude - set(ProblemSchema().fields)
+        if unknown:
+            raise BadRequest('Unknown fields to exclude: ' + ', '.join(sorted(unknown)))
         if not problem.sample_tests:
-            schema = ProblemSchema(exclude=['sample_tests_json'])
-        else:
-            schema = ProblemSchema()
+            exclude.add('sample_tests_json')
 
-        data = schema.dump(problem).data
+        data = ProblemSchema(exclude=tuple(exclude)).dump(problem).data
         if args.get('user_id') is not None:
             # not narrowed by the statement's allowed_languages: the client does that
             data['languages'] = [
