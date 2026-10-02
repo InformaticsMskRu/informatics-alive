@@ -13,7 +13,7 @@ from sqlalchemy.orm import Load
 from webargs.flaskparser import parser
 from werkzeug.exceptions import BadRequest, NotFound
 
-from rmatics.ejudge.routing import resolve_route
+from rmatics.ejudge.routing import available_languages, resolve_route
 from rmatics.ejudge.submit_queue.task import (
     submit_task,
 )
@@ -178,6 +178,26 @@ class ProblemApi(MethodView):
 
         data = schema.dump(problem)
         return jsonify(data.data)
+
+
+class ProblemLanguagesApi(MethodView):
+    """Languages the user can submit this problem in (see available_languages)."""
+    get_args = {
+        'user_id': fields.Integer(required=True),
+        'statement_id': fields.Integer(required=False),
+        'context_id': fields.Integer(required=False),
+    }
+
+    def get(self, problem_id: int):
+        args = parser.parse(self.get_args, request)
+        problem = db.session.query(EjudgeProblem).filter_by(id=problem_id).one_or_none()
+        if not problem:
+            raise NotFound('Problem with this id is not found')
+
+        # same statement as the one checked on submit
+        statement_id = args.get('context_id') or args.get('statement_id')
+        statement = db.session.query(Statement).get(statement_id) if statement_id else None
+        return jsonify(available_languages(problem, args['user_id'], statement))
 
 
 get_args = {
