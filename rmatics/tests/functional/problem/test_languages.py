@@ -45,3 +45,8 @@ class TestProblemLanguages(TestCase):
 
     def test_user_id_is_required(self):
         self.assertEqual(self.get().status_code, 422)
+
+    def test_output_only_language_has_no_name(self):
+        self.ejudge_problems[0].output_only = True
+        db.session.commit()
+        self.assertEqual(self.get(user_id=1).json['data'], [{'id': 0, 'name': None}])

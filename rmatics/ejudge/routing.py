@@ -139,11 +139,14 @@ def resolve_route(problem, lang_id: int, user_id: int) -> Route:
     return route
 
 
-OUTPUT_ONLY_LANG_NAME = 'Текстовый файл'
+class AvailableLanguage(NamedTuple):
+    id: int
+    # None for output-only problems: the answer is a text file, not a language
+    name: Optional[str]
 
 
-def available_languages(problem, user_id: int, statement=None) -> List[dict]:
-    """Languages a run of user_id can be submitted in: [{'id', 'name'}, ...].
+def available_languages(problem, user_id: int, statement=None) -> List[AvailableLanguage]:
+    """Languages a run of user_id can be submitted in.
 
     A language is listed when resolve_route accepts it and its judge is in the
     config (submit_task fails runs routed to an unknown judge), named as the
@@ -170,10 +173,10 @@ def available_languages(problem, user_id: int, statement=None) -> List[dict]:
         if judge is None:
             continue
         if problem.output_only:
-            name = OUTPUT_ONLY_LANG_NAME
+            name = None
         elif statement is not None and not statement.is_language_allowed(lang_id):
             continue
         else:
             name = judge.langs[lang_id].name
-        result.append({'id': lang_id, 'name': name})
+        result.append(AvailableLanguage(lang_id, name))
     return result

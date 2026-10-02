@@ -1,7 +1,7 @@
 from unittest import mock
 
 from rmatics.ejudge.judges_config import JudgeLang
-from rmatics.ejudge.routing import Route, available_languages, resolve_route
+from rmatics.ejudge.routing import AvailableLanguage, Route, available_languages, resolve_route
 from rmatics.model.statement import Statement
 from rmatics.utils.exceptions import LanguageNotSupported
 from rmatics.testutils import TestCase
@@ -145,13 +145,13 @@ class TestAvailableLanguages(TestCase):
         self.create_judges()
 
     def ids(self, problem, statement=None):
-        return [lang['id'] for lang in available_languages(problem, USER, statement)]
+        return [lang.id for lang in available_languages(problem, USER, statement)]
 
     def test_no_settings_lists_default_judge_langs_with_names(self):
         self.assertEqual(available_languages(_problem(), USER), [
-            {'id': 1, 'name': 'Free Pascal 3.0'},
-            {'id': 3, 'name': 'GNU C++ 11.2'},
-            {'id': 27, 'name': 'Python 3.9'},
+            AvailableLanguage(1, 'Free Pascal 3.0'),
+            AvailableLanguage(3, 'GNU C++ 11.2'),
+            AvailableLanguage(27, 'Python 3.9'),
         ])
 
     def test_no_settings_ignores_langs_only_other_judges_have(self):
@@ -163,7 +163,7 @@ class TestAvailableLanguages(TestCase):
         self.judges[1].langs = {3: JudgeLang('GNU C++ 11.2', 3)}
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6}])
         self.assertEqual(available_languages(problem, USER),
-                         [{'id': 71, 'name': 'Kotlin 1.9'}])
+                         [AvailableLanguage(71, 'Kotlin 1.9')])
 
     def test_lang_ids_narrow_the_judge_langs(self):
         problem = _problem([{'judge_id': 2, 'contest_id': 500, 'problem_id': 6,
@@ -195,7 +195,7 @@ class TestAvailableLanguages(TestCase):
         problem = _problem(output_only=True)
         statement = Statement(settings={'allowed_languages': [27]})
         self.assertEqual(available_languages(problem, USER, statement),
-                         [{'id': 0, 'name': 'Текстовый файл'}])
+                         [AvailableLanguage(0, None)])
 
     def test_output_only_unroutable(self):
         problem = _problem([{'judge_id': 2, 'contest_id': 5, 'problem_id': 6,

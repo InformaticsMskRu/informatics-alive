@@ -197,7 +197,8 @@ class ProblemLanguagesApi(MethodView):
         # same statement as the one checked on submit
         statement_id = args.get('context_id') or args.get('statement_id')
         statement = db.session.query(Statement).get(statement_id) if statement_id else None
-        return jsonify(available_languages(problem, args['user_id'], statement))
+        languages = available_languages(problem, args['user_id'], statement)
+        return jsonify([language._asdict() for language in languages])
 
 
 get_args = {
