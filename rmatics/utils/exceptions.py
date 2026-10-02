@@ -10,8 +10,3 @@ from werkzeug.exceptions import BadRequest
 class LanguageNotSupported(BadRequest):
     """No judge the problem routes to accepts the language."""
     error_code = 'language_not_supported'
-
-
-class LanguageNotAllowed(BadRequest):
-    """The statement (contest) doesn't allow the language."""
-    error_code = 'language_not_allowed'

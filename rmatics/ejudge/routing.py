@@ -151,8 +151,8 @@ def available_languages(problem, user_id: int) -> List[AvailableLanguage]:
     A language is listed when resolve_route accepts it and its judge is in the
     config (submit_task fails runs routed to an unknown judge), named as the
     judge it is routed to names it. Candidates are the languages of all judges,
-    in config order. The statement's allowed_languages is not applied here:
-    the caller narrows the list, and submit enforces it.
+    in config order. A statement's allowed_languages is not rmatics' concern:
+    the client narrows the list and checks it on submit.
     """
     if problem.output_only:
         candidates = [OUTPUT_ONLY_LANG_ID]
